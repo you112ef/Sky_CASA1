@@ -60,7 +60,11 @@ namespace MedicalLabAnalyzer.Helpers
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
+            if (value is Visibility visibility)
+            {
+                return visibility == Visibility.Visible ? "Visible" : "Hidden";
+            }
+            return string.Empty;
         }
     }
 
@@ -73,7 +77,11 @@ namespace MedicalLabAnalyzer.Helpers
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
+            if (value is Visibility visibility)
+            {
+                return visibility == Visibility.Visible ? new object() : null;
+            }
+            return null;
         }
     }
 
@@ -90,7 +98,11 @@ namespace MedicalLabAnalyzer.Helpers
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
+            if (value is string stringValue && DateTime.TryParse(stringValue, out DateTime result))
+            {
+                return result;
+            }
+            return DateTime.Now;
         }
     }
 
@@ -113,7 +125,80 @@ namespace MedicalLabAnalyzer.Helpers
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
+            if (value is string color)
+            {
+                return color switch
+                {
+                    "#4CAF50" => "normal",
+                    "#FF9800" => "abnormal",
+                    "#F44336" => "critical",
+                    _ => "unknown"
+                };
+            }
+            return "unknown";
+        }
+    }
+
+    public class DoubleToIntConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is double doubleValue)
+            {
+                return (int)Math.Round(doubleValue);
+            }
+            return 0;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is int intValue)
+            {
+                return (double)intValue;
+            }
+            return 0.0;
+        }
+    }
+
+    public class StringToBoolConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string stringValue)
+            {
+                return !string.IsNullOrEmpty(stringValue);
+            }
+            return false;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is bool boolValue)
+            {
+                return boolValue ? "true" : "false";
+            }
+            return "false";
+        }
+    }
+
+    public class NullableBoolToBoolConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is bool? nullableBool)
+            {
+                return nullableBool ?? false;
+            }
+            return false;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is bool boolValue)
+            {
+                return (bool?)boolValue;
+            }
+            return (bool?)false;
         }
     }
 }

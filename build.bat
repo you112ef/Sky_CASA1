@@ -1,25 +1,27 @@
 @echo off
 echo ========================================
-echo Medical Lab Analyzer - Build Script
+echo MedicalLabAnalyzer Build Script
 echo ========================================
 echo.
 
-REM Check if .NET 8 is installed
+REM Check if .NET 8.0 is installed
+echo Checking .NET 8.0 installation...
 dotnet --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo ERROR: .NET 8 SDK is not installed!
-    echo Please install .NET 8 SDK from: https://dotnet.microsoft.com/download
+    echo ERROR: .NET 8.0 is not installed or not in PATH
+    echo Please install .NET 8.0 Desktop Runtime from:
+    echo https://dotnet.microsoft.com/download/dotnet/8.0
     pause
     exit /b 1
 )
 
-echo .NET Version: 
+echo .NET version found: 
 dotnet --version
 echo.
 
 REM Clean previous builds
 echo Cleaning previous builds...
-dotnet clean src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj
+dotnet clean
 if %errorlevel% neq 0 (
     echo ERROR: Failed to clean project
     pause
@@ -28,82 +30,42 @@ if %errorlevel% neq 0 (
 
 REM Restore packages
 echo Restoring NuGet packages...
-dotnet restore src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj
+dotnet restore
 if %errorlevel% neq 0 (
     echo ERROR: Failed to restore packages
     pause
     exit /b 1
 )
 
-REM Build in Debug mode
-echo Building in Debug mode...
-dotnet build src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj -c Debug
-if %errorlevel% neq 0 (
-    echo ERROR: Debug build failed
-    pause
-    exit /b 1
-)
-
 REM Build in Release mode
-echo Building in Release mode...
-dotnet build src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj -c Release
+echo Building project in Release mode...
+dotnet build --configuration Release --no-restore
 if %errorlevel% neq 0 (
-    echo ERROR: Release build failed
+    echo ERROR: Build failed
     pause
     exit /b 1
 )
 
 REM Run tests
 echo Running tests...
-dotnet test tests/MedicalLabAnalyzer.Tests/MedicalLabAnalyzer.Tests.csproj
+dotnet test --configuration Release --no-build
 if %errorlevel% neq 0 (
-    echo WARNING: Some tests failed
+    echo WARNING: Some tests failed, but build completed
     echo.
 )
-
-REM Publish for Windows x64
-echo Publishing for Windows x64...
-dotnet publish src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj ^
-    -c Release ^
-    -r win-x64 ^
-    -p:PublishSingleFile=true ^
-    --self-contained true ^
-    -o publish/win-x64
-
-if %errorlevel% neq 0 (
-    echo ERROR: Publishing failed
-    pause
-    exit /b 1
-)
-
-REM Create deployment package
-echo Creating deployment package...
-if not exist "deploy" mkdir deploy
-xcopy /E /I /Y "publish\win-x64" "deploy\MedicalLabAnalyzer"
-xcopy /E /I /Y "Database" "deploy\MedicalLabAnalyzer\Database"
-xcopy /E /I /Y "src\MedicalLabAnalyzer\Reports" "deploy\MedicalLabAnalyzer\Reports"
-copy "src\MedicalLabAnalyzer\appsettings.json" "deploy\MedicalLabAnalyzer\"
-copy "README.md" "deploy\MedicalLabAnalyzer\"
-copy "LICENSE" "deploy\MedicalLabAnalyzer\"
-
-REM Create ZIP package
-echo Creating ZIP package...
-powershell -Command "Compress-Archive -Path 'deploy\MedicalLabAnalyzer' -DestinationPath 'deploy\MedicalLabAnalyzer-v1.0.0.zip' -Force"
 
 echo.
 echo ========================================
 echo Build completed successfully!
 echo ========================================
 echo.
-echo Output locations:
-echo - Debug build: src\MedicalLabAnalyzer\bin\Debug\net8.0-windows\
-echo - Release build: src\MedicalLabAnalyzer\bin\Release\net8.0-windows\
-echo - Published: publish\win-x64\
-echo - Deployment package: deploy\MedicalLabAnalyzer\
-echo - ZIP package: deploy\MedicalLabAnalyzer-v1.0.0.zip
+echo Output location: bin\Release\net8.0-windows\
 echo.
 echo To run the application:
-echo - Debug: dotnet run --project src\MedicalLabAnalyzer\MedicalLabAnalyzer.csproj
-echo - Release: deploy\MedicalLabAnalyzer\MedicalLabAnalyzer.exe
+echo   dotnet run --configuration Release
 echo.
+echo Or run the executable directly:
+echo   bin\Release\net8.0-windows\MedicalLabAnalyzer.exe
+echo.
+
 pause

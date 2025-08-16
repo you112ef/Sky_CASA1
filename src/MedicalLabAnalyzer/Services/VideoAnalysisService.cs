@@ -24,6 +24,7 @@ namespace MedicalLabAnalyzer.Services
     {
         private readonly ILogger<VideoAnalysisService> _logger;
         private readonly string _outputDirectory;
+        private Mat? _previousFrame;
 
         public VideoAnalysisService(ILogger<VideoAnalysisService> logger)
         {
@@ -271,8 +272,6 @@ namespace MedicalLabAnalyzer.Services
             var bytes = BitConverter.GetBytes(fourCC);
             return System.Text.Encoding.ASCII.GetString(bytes);
         }
-
-        private Mat? _previousFrame;
 
         public void Dispose()
         {
