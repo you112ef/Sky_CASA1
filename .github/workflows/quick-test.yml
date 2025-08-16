@@ -7,7 +7,8 @@ on:
 
 jobs:
   quick-test:
-    runs-on: windows-latest
+    runs-on: windows-2022  # Use specific version to avoid migration notice
+    timeout-minutes: 15
     
     steps:
     - name: Checkout code
@@ -21,8 +22,8 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore MedicalLabAnalyzer.sln
       
-    - name: Build (Debug)
-      run: dotnet build MedicalLabAnalyzer.sln --configuration Debug --no-restore
+    - name: Build solution
+      run: dotnet build MedicalLabAnalyzer.sln --configuration Debug --no-restore --verbosity normal
       
     - name: Test project structure
       run: |
@@ -44,5 +45,8 @@ jobs:
         echo "✅ Project structure validation passed"
       shell: pwsh
       
-    - name: Basic test run
-      run: dotnet test tests/MedicalLabAnalyzer.Tests/MedicalLabAnalyzer.Tests.csproj --configuration Debug --no-build --verbosity normal
+    - name: Build test project
+      run: dotnet build tests/MedicalLabAnalyzer.Tests/MedicalLabAnalyzer.Tests.csproj --configuration Debug --no-restore
+      
+    - name: Run basic tests
+      run: dotnet test tests/MedicalLabAnalyzer.Tests/MedicalLabAnalyzer.Tests.csproj --configuration Debug --no-build --verbosity normal --logger "console;verbosity=detailed"
