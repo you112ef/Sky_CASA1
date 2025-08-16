@@ -100,6 +100,8 @@ jobs:
       if: ${{ github.event.inputs.run_tests != false }}
       run: |
         Write-Host "Running unit tests with code coverage..."
+        # Create TestResults directory if it doesn't exist
+        New-Item -ItemType Directory -Path "TestResults" -Force
         dotnet test ${{ env.SOLUTION_FILE }} --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity normal `
           --logger "trx;LogFileName=test_results.trx" `
           --logger "console;verbosity=normal" `
@@ -109,7 +111,8 @@ jobs:
           /p:MergeWith=./TestResults/coverage.cobertura.xml `
           /p:Threshold=80 `
           /p:ThresholdType=line `
-          /p:ThresholdStat=total
+          /p:ThresholdStat=total `
+          --results-directory ./TestResults
         Write-Host "Unit tests completed successfully"
 
     - name: Publish test results
@@ -118,15 +121,15 @@ jobs:
       with:
         name: TestResults-${{ github.run_number }}
         path: |
-          **/TestResults/*.trx
-          **/TestResults/coverage.cobertura.xml
+          TestResults/*.trx
+          TestResults/coverage.cobertura.xml
         retention-days: 30
 
     - name: Generate test report
       if: ${{ github.event.inputs.run_tests != false }}
       run: |
         Write-Host "Generating test report..."
-        $testResults = Get-ChildItem -Path "**/TestResults/*.trx" -Recurse
+        $testResults = Get-ChildItem -Path "TestResults/*.trx" -ErrorAction SilentlyContinue
         if ($testResults) {
           Write-Host "Test results found:"
           $testResults | ForEach-Object { Write-Host "  - $($_.FullName)" }
@@ -138,7 +141,7 @@ jobs:
       if: ${{ github.event.inputs.run_tests != false }}
       run: |
         Write-Host "Checking code coverage..."
-        $coverageFile = Get-ChildItem -Path "**/TestResults/coverage.cobertura.xml" -Recurse | Select-Object -First 1
+        $coverageFile = Get-ChildItem -Path "TestResults/coverage.cobertura.xml" -ErrorAction SilentlyContinue
         if ($coverageFile) {
           Write-Host "Coverage report found: $($coverageFile.FullName)"
           $coverageContent = Get-Content $coverageFile.FullName -Raw

@@ -1,53 +1,79 @@
-name: Simple Build Test
+name: Simple Build and Test - MedicalLabAnalyzer
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
 
 env:
   DOTNET_VERSION: '8.0.x'
-  PROJECT_FILE: 'MedicalLabAnalyzer.csproj'
+  SOLUTION_FILE: 'MedicalLabAnalyzer.sln'
 
 jobs:
-  build:
+  build-and-test:
+    name: Build and Test
     runs-on: windows-latest
+    timeout-minutes: 20
     
     steps:
-    - name: Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Setup .NET
+    - name: Setup .NET 8
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Clear NuGet cache
-      run: dotnet nuget locals all --clear
+      run: |
+        Write-Host "Clearing NuGet cache..."
+        dotnet nuget locals all --clear
+        Write-Host "NuGet cache cleared successfully"
 
-    - name: Restore dependencies
-      run: dotnet restore ${{ env.PROJECT_FILE }} --verbosity normal
+    - name: Restore packages
+      run: |
+        Write-Host "Restoring NuGet packages..."
+        dotnet restore ${{ env.SOLUTION_FILE }} --verbosity normal
+        Write-Host "NuGet packages restored successfully"
 
-    - name: Build project
-      run: dotnet build ${{ env.PROJECT_FILE }} --configuration Release --no-restore --verbosity normal
+    - name: Build solution
+      run: |
+        Write-Host "Building solution..."
+        dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore --verbosity normal
+        Write-Host "Solution built successfully"
 
-    - name: Test project
-      run: dotnet test ${{ env.PROJECT_FILE }} --configuration Release --no-build --verbosity normal
+    - name: Run tests
+      run: |
+        Write-Host "Running tests..."
+        # Create TestResults directory
+        New-Item -ItemType Directory -Path "TestResults" -Force
+        dotnet test ${{ env.SOLUTION_FILE }} --configuration Release --no-build --verbosity normal --logger "console;verbosity=normal"
+        Write-Host "Tests completed successfully"
 
-    - name: Publish project
-      run: dotnet publish ${{ env.PROJECT_FILE }} --configuration Release --runtime win-x64 --self-contained true --output publish/win-x64 --verbosity normal
+    - name: Check build artifacts
+      run: |
+        Write-Host "Checking build artifacts..."
+        $binPath = "bin/Release/net8.0-windows"
+        if (Test-Path $binPath) {
+          $files = Get-ChildItem $binPath -Recurse -File | Measure-Object -Property Length -Sum
+          Write-Host "Build artifacts found: $($files.Count) files, $([math]::Round($files.Sum / 1MB, 2)) MB"
+        } else {
+          Write-Host "##[warning]No build artifacts found"
+        }
 
     - name: Upload build artifacts
+      if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: build-artifacts
-        path: publish/win-x64/
+        name: BuildArtifacts-${{ github.run_number }}
+        path: bin/Release/net8.0-windows/
+        retention-days: 7
 
     - name: Success message
       run: |
-        Write-Host "✅ Build completed successfully!"
+        Write-Host "✅ Build and test completed successfully!"
         Write-Host "Build Number: ${{ github.run_number }}"
         Write-Host "Commit: ${{ github.sha }}"
         Write-Host "Branch: ${{ github.ref_name }}"
