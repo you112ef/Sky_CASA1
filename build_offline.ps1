@@ -1,191 +1,481 @@
 # Medical Lab Analyzer - Offline Build Script
-# This script builds and packages the application without internet connection
+# This script builds the application in an offline environment with all dependencies
 
 param(
     [string]$Configuration = "Release",
-    [string]$Runtime = "win-x64",
+    [string]$Platform = "AnyCPU",
+    [string]$OutputPath = ".\install",
+    [switch]$Clean,
     [switch]$SkipTests,
     [switch]$CreateInstaller
 )
 
-Write-Host "=== Medical Lab Analyzer - Offline Build Script ===" -ForegroundColor Green
-Write-Host "Configuration: $Configuration" -ForegroundColor Yellow
-Write-Host "Runtime: $Runtime" -ForegroundColor Yellow
-Write-Host "Skip Tests: $SkipTests" -ForegroundColor Yellow
-Write-Host "Create Installer: $CreateInstaller" -ForegroundColor Yellow
-Write-Host ""
+$ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
 
-# Check prerequisites
-Write-Host "Checking prerequisites..." -ForegroundColor Cyan
-
-# Check .NET SDK
-try {
-    $dotnetVersion = dotnet --version
-    Write-Host "✓ .NET SDK found: $dotnetVersion" -ForegroundColor Green
-} catch {
-    Write-Host "✗ .NET SDK not found. Please install .NET 8.0 SDK" -ForegroundColor Red
-    exit 1
+# Colors for output
+$Colors = @{
+    Info = "Cyan"
+    Success = "Green"
+    Warning = "Yellow"
+    Error = "Red"
 }
 
-# Check if required packages are available locally
-$nugetPackages = @(
-    "Emgu.CV",
-    "Emgu.CV.runtime.windows", 
-    "System.Data.SQLite.Core",
-    "Dapper",
-    "BCrypt.Net-Next",
-    "PdfSharp-MigraDoc",
-    "Newtonsoft.Json"
-)
+function Write-ColorOutput {
+    param([string]$Message, [string]$Color = "White")
+    Write-Host $Message -ForegroundColor $Colors[$Color]
+}
 
-Write-Host "Checking NuGet packages..." -ForegroundColor Cyan
-foreach ($package in $nugetPackages) {
-    $packagePath = "$env:USERPROFILE\.nuget\packages\$package"
-    if (Test-Path $packagePath) {
-        Write-Host "✓ $package found" -ForegroundColor Green
-    } else {
-        Write-Host "✗ $package not found locally" -ForegroundColor Red
-        Write-Host "  Please download packages while online or use local NuGet feed" -ForegroundColor Yellow
+function Test-Command {
+    param([string]$Command)
+    try {
+        Get-Command $Command -ErrorAction Stop | Out-Null
+        return $true
+    }
+    catch {
+        return $false
     }
 }
 
-Write-Host ""
-
-# Clean previous builds
-Write-Host "Cleaning previous builds..." -ForegroundColor Cyan
-dotnet clean src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Warning: Clean failed, continuing..." -ForegroundColor Yellow
-}
-
-# Restore packages (will use local cache if offline)
-Write-Host "Restoring NuGet packages..." -ForegroundColor Cyan
-dotnet restore src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: Package restore failed" -ForegroundColor Red
-    exit 1
-}
-
-# Build the solution
-Write-Host "Building solution..." -ForegroundColor Cyan
-dotnet build src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj -c $Configuration
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: Build failed" -ForegroundColor Red
-    exit 1
-}
-
-# Run tests (unless skipped)
-if (-not $SkipTests) {
-    Write-Host "Running tests..." -ForegroundColor Cyan
-    dotnet test tests/MedicalLabAnalyzer.Tests/MedicalLabAnalyzer.Tests.csproj
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Warning: Some tests failed" -ForegroundColor Yellow
+function Test-DotNet {
+    if (-not (Test-Command "dotnet")) {
+        Write-ColorOutput "❌ .NET SDK not found. Please install .NET 8.0 SDK." "Error"
+        exit 1
     }
+    
+    $version = dotnet --version
+    Write-ColorOutput "✅ .NET SDK found: $version" "Success"
 }
 
-# Publish the application
-Write-Host "Publishing application..." -ForegroundColor Cyan
-$publishPath = "publish/$Runtime"
-dotnet publish src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj `
-    -c $Configuration `
-    -r $Runtime `
-    -p:PublishSingleFile=true `
-    --self-contained true `
-    -o $publishPath
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: Publishing failed" -ForegroundColor Red
-    exit 1
-}
-
-# Create deployment package
-Write-Host "Creating deployment package..." -ForegroundColor Cyan
-$deployPath = "deploy/MedicalLabAnalyzer"
-if (Test-Path $deployPath) {
-    Remove-Item $deployPath -Recurse -Force
-}
-New-Item -ItemType Directory -Path $deployPath -Force | Out-Null
-
-# Copy published files
-Copy-Item "$publishPath/*" $deployPath -Recurse -Force
-
-# Copy additional files
-if (Test-Path "Database") {
-    Copy-Item "Database" $deployPath -Recurse -Force
-}
-if (Test-Path "src/MedicalLabAnalyzer/Reports") {
-    Copy-Item "src/MedicalLabAnalyzer/Reports" $deployPath -Recurse -Force
-}
-if (Test-Path "src/MedicalLabAnalyzer/appsettings.json") {
-    Copy-Item "src/MedicalLabAnalyzer/appsettings.json" $deployPath
-}
-Copy-Item "README.md" $deployPath
-Copy-Item "LICENSE" $deployPath
-
-# Create ZIP package
-Write-Host "Creating ZIP package..." -ForegroundColor Cyan
-$zipPath = "deploy/MedicalLabAnalyzer-v1.0.0-$Configuration.zip"
-if (Test-Path $zipPath) {
-    Remove-Item $zipPath -Force
-}
-Compress-Archive -Path $deployPath -DestinationPath $zipPath -Force
-
-# Create installer if requested
-if ($CreateInstaller) {
-    Write-Host "Creating installer..." -ForegroundColor Cyan
-    if (Test-Path "install/MedicalLabAnalyzer.iss") {
-        # Check if Inno Setup is available
-        $innoPath = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-        if (Test-Path $innoPath) {
-            & $innoPath "install/MedicalLabAnalyzer.iss"
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host "✓ Installer created successfully" -ForegroundColor Green
-            } else {
-                Write-Host "✗ Installer creation failed" -ForegroundColor Red
-            }
-        } else {
-            Write-Host "✗ Inno Setup not found. Installer not created." -ForegroundColor Yellow
+function Test-NuGet {
+    if (-not (Test-Command "nuget")) {
+        Write-ColorOutput "⚠️  NuGet CLI not found. Installing..." "Warning"
+        
+        # Download NuGet CLI
+        $nugetUrl = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
+        $nugetPath = ".\tools\nuget.exe"
+        
+        if (-not (Test-Path ".\tools")) {
+            New-Item -ItemType Directory -Path ".\tools" | Out-Null
         }
-    } else {
-        Write-Host "✗ Inno Setup script not found" -ForegroundColor Yellow
+        
+        Invoke-WebRequest -Uri $nugetUrl -OutFile $nugetPath
+        $env:PATH += ";$PWD\tools"
+        
+        Write-ColorOutput "✅ NuGet CLI installed" "Success"
+    }
+    else {
+        Write-ColorOutput "✅ NuGet CLI found" "Success"
     }
 }
 
-# Summary
-Write-Host ""
-Write-Host "=== Build Summary ===" -ForegroundColor Green
-Write-Host "✓ Build completed successfully" -ForegroundColor Green
-Write-Host ""
-Write-Host "Output locations:" -ForegroundColor Cyan
-Write-Host "  - Published: $publishPath" -ForegroundColor White
-Write-Host "  - Deployment: $deployPath" -ForegroundColor White
-Write-Host "  - ZIP Package: $zipPath" -ForegroundColor White
-Write-Host ""
-Write-Host "To run the application:" -ForegroundColor Cyan
-Write-Host "  - Debug: dotnet run --project src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj" -ForegroundColor White
-Write-Host "  - Release: $deployPath/MedicalLabAnalyzer.exe" -ForegroundColor White
-Write-Host ""
-Write-Host "Default credentials: admin / admin123" -ForegroundColor Yellow
-Write-Host ""
-
-# Check for potential issues
-Write-Host "=== Potential Issues Check ===" -ForegroundColor Cyan
-
-# Check for EmguCV runtime files
-$emguFiles = @("opencv_videoio_ffmpeg*.dll", "opencv_world*.dll")
-foreach ($pattern in $emguFiles) {
-    $files = Get-ChildItem $deployPath -Name $pattern
-    if ($files.Count -eq 0) {
-        Write-Host "⚠ Warning: EmguCV runtime files not found ($pattern)" -ForegroundColor Yellow
-        Write-Host "  These are required for video analysis functionality" -ForegroundColor Yellow
+function Initialize-Environment {
+    Write-ColorOutput "🔧 Initializing build environment..." "Info"
+    
+    # Create necessary directories
+    $directories = @(
+        ".\tools",
+        ".\packages",
+        ".\local-nuget",
+        ".\Database",
+        ".\Samples",
+        $OutputPath
+    )
+    
+    foreach ($dir in $directories) {
+        if (-not (Test-Path $dir)) {
+            New-Item -ItemType Directory -Path $dir | Out-Null
+            Write-ColorOutput "   Created directory: $dir" "Info"
+        }
+    }
+    
+    # Create local NuGet feed
+    if (-not (Test-Path ".\local-nuget\nuget.config")) {
+        @"
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="Local" value=".\local-nuget" />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+  </packageSources>
+</configuration>
+"@ | Out-File -FilePath ".\local-nuget\nuget.config" -Encoding UTF8
     }
 }
 
-# Check database
-if (-not (Test-Path "$deployPath/Database/medical_lab.db")) {
-    Write-Host "⚠ Warning: Database file not found" -ForegroundColor Yellow
-    Write-Host "  Database will be created automatically on first run" -ForegroundColor Yellow
+function Download-Packages {
+    Write-ColorOutput "📦 Downloading NuGet packages..." "Info"
+    
+    # Create packages.config for offline download
+    $packagesConfig = @"
+<?xml version="1.0" encoding="utf-8"?>
+<packages>
+  <!-- WPF and UI Dependencies -->
+  <package id="Microsoft.Xaml.Behaviors.Wpf" version="1.1.77" targetFramework="net8.0-windows" />
+  <package id="MaterialDesignThemes" version="4.9.0" targetFramework="net8.0-windows" />
+  <package id="MaterialDesignColors" version="2.1.4" targetFramework="net8.0-windows" />
+  
+  <!-- EmguCV for Video Analysis -->
+  <package id="Emgu.CV" version="4.8.1.5350" targetFramework="net8.0-windows" />
+  <package id="Emgu.CV.runtime.windows" version="4.8.1.5350" targetFramework="net8.0-windows" />
+  
+  <!-- Database and ORM -->
+  <package id="System.Data.SQLite.Core" version="1.0.118" targetFramework="net8.0-windows" />
+  <package id="Dapper" version="2.1.15" targetFramework="net8.0-windows" />
+  
+  <!-- Password Hashing -->
+  <package id="BCrypt.Net-Next" version="4.0.3" targetFramework="net8.0-windows" />
+  
+  <!-- PDF Generation -->
+  <package id="PdfSharp-MigraDoc" version="1.50.5147" targetFramework="net8.0-windows" />
+  
+  <!-- JSON Support -->
+  <package id="Newtonsoft.Json" version="13.0.3" targetFramework="net8.0-windows" />
+  
+  <!-- Logging and Configuration -->
+  <package id="Microsoft.Extensions.Logging" version="8.0.0" targetFramework="net8.0-windows" />
+  <package id="Microsoft.Extensions.Configuration" version="8.0.0" targetFramework="net8.0-windows" />
+  <package id="Microsoft.Extensions.Configuration.Json" version="8.0.0" targetFramework="net8.0-windows" />
+  <package id="Serilog" version="3.1.1" targetFramework="net8.0-windows" />
+  <package id="Serilog.Extensions.Logging" version="8.0.0" targetFramework="net8.0-windows" />
+  <package id="Serilog.Sinks.File" version="5.0.0" targetFramework="net8.0-windows" />
+  
+  <!-- Validation and Utilities -->
+  <package id="FluentValidation" version="11.8.1" targetFramework="net8.0-windows" />
+  <package id="AutoMapper" version="12.0.1" targetFramework="net8.0-windows" />
+  
+  <!-- Excel Export -->
+  <package id="EPPlus" version="7.0.5" targetFramework="net8.0-windows" />
+  
+  <!-- MVVM Framework -->
+  <package id="CommunityToolkit.Mvvm" version="8.2.2" targetFramework="net8.0-windows" />
+  
+  <!-- CSV Helper for Export -->
+  <package id="CsvHelper" version="30.0.1" targetFramework="net8.0-windows" />
+</packages>
+"@
+    
+    $packagesConfig | Out-File -FilePath ".\packages\packages.config" -Encoding UTF8
+    
+    # Download packages
+    nuget restore ".\packages\packages.config" -PackagesDirectory ".\packages" -ConfigFile ".\nuget.config"
+    
+    Write-ColorOutput "✅ Packages downloaded successfully" "Success"
 }
 
-Write-Host ""
-Write-Host "Build completed successfully!" -ForegroundColor Green
+function Build-Project {
+    Write-ColorOutput "🔨 Building project..." "Info"
+    
+    if ($Clean) {
+        Write-ColorOutput "   Cleaning previous build..." "Info"
+        dotnet clean --configuration $Configuration
+    }
+    
+    # Restore packages
+    Write-ColorOutput "   Restoring packages..." "Info"
+    dotnet restore --configfile ".\nuget.config"
+    
+    # Build project
+    Write-ColorOutput "   Building with configuration: $Configuration" "Info"
+    dotnet build --configuration $Configuration --no-restore
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-ColorOutput "❌ Build failed!" "Error"
+        exit 1
+    }
+    
+    Write-ColorOutput "✅ Build completed successfully" "Success"
+}
+
+function Run-Tests {
+    if ($SkipTests) {
+        Write-ColorOutput "⏭️  Skipping tests" "Warning"
+        return
+    }
+    
+    Write-ColorOutput "🧪 Running tests..." "Info"
+    
+    # Run unit tests
+    dotnet test --configuration $Configuration --no-build --verbosity normal
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-ColorOutput "❌ Tests failed!" "Error"
+        exit 1
+    }
+    
+    Write-ColorOutput "✅ All tests passed" "Success"
+}
+
+function Create-Database {
+    Write-ColorOutput "🗄️  Initializing database..." "Info"
+    
+    $dbPath = ".\Database\medical_lab.db"
+    
+    # Create database directory if it doesn't exist
+    if (-not (Test-Path ".\Database")) {
+        New-Item -ItemType Directory -Path ".\Database" | Out-Null
+    }
+    
+    # Initialize database using the application
+    $exePath = ".\src\MedicalLabAnalyzer\bin\$Configuration\net8.0-windows\MedicalLabAnalyzer.exe"
+    
+    if (Test-Path $exePath) {
+        Write-ColorOutput "   Database will be initialized on first run" "Info"
+    }
+    else {
+        Write-ColorOutput "⚠️  Application executable not found. Database will be created on first run." "Warning"
+    }
+}
+
+function Copy-Files {
+    Write-ColorOutput "📋 Copying files to output directory..." "Info"
+    
+    $sourceDir = ".\src\MedicalLabAnalyzer\bin\$Configuration\net8.0-windows"
+    $targetDir = $OutputPath
+    
+    if (-not (Test-Path $sourceDir)) {
+        Write-ColorOutput "❌ Build output not found: $sourceDir" "Error"
+        exit 1
+    }
+    
+    # Copy application files
+    Copy-Item -Path "$sourceDir\*" -Destination $targetDir -Recurse -Force
+    
+    # Copy additional files
+    $additionalFiles = @(
+        ".\README.md",
+        ".\LICENSE",
+        ".\CHANGELOG.txt"
+    )
+    
+    foreach ($file in $additionalFiles) {
+        if (Test-Path $file) {
+            Copy-Item -Path $file -Destination $targetDir -Force
+        }
+    }
+    
+    # Create Samples directory
+    $samplesDir = Join-Path $targetDir "Samples"
+    if (-not (Test-Path $samplesDir)) {
+        New-Item -ItemType Directory -Path $samplesDir | Out-Null
+    }
+    
+    # Create placeholder for sample video
+    $sampleVideoPath = Join-Path $samplesDir "sperm_sample.mp4"
+    if (-not (Test-Path $sampleVideoPath)) {
+        @"
+# Sample Video File
+# Place your sperm analysis video file here
+# Supported formats: MP4, AVI, MOV
+# Recommended: 25-30 FPS, 640x480 or higher resolution
+"@ | Out-File -FilePath "$sampleVideoPath.txt" -Encoding UTF8
+    }
+    
+    Write-ColorOutput "✅ Files copied successfully" "Success"
+}
+
+function Create-Installer {
+    if (-not $CreateInstaller) {
+        return
+    }
+    
+    Write-ColorOutput "📦 Creating installer..." "Info"
+    
+    # Create NSIS script for installer
+    $nsisScript = @"
+!include "MUI2.nsh"
+
+Name "Medical Lab Analyzer"
+OutFile "MedicalLabAnalyzer-Setup.exe"
+InstallDir "$PROGRAMFILES\Medical Lab Analyzer"
+RequestExecutionLevel admin
+
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+
+!insertmacro MUI_LANGUAGE "English"
+
+Section "Install"
+    SetOutPath "$INSTDIR"
+    File /r "$OutputPath\*"
+    
+    CreateDirectory "$SMPROGRAMS\Medical Lab Analyzer"
+    CreateShortCut "$SMPROGRAMS\Medical Lab Analyzer\Medical Lab Analyzer.lnk" "$INSTDIR\MedicalLabAnalyzer.exe"
+    CreateShortCut "$DESKTOP\Medical Lab Analyzer.lnk" "$INSTDIR\MedicalLabAnalyzer.exe"
+    
+    WriteUninstaller "$INSTDIR\Uninstall.exe"
+    
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MedicalLabAnalyzer" "DisplayName" "Medical Lab Analyzer"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MedicalLabAnalyzer" "UninstallString" "$INSTDIR\Uninstall.exe"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MedicalLabAnalyzer" "DisplayIcon" "$INSTDIR\MedicalLabAnalyzer.exe"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MedicalLabAnalyzer" "Publisher" "Medical Lab Solutions"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MedicalLabAnalyzer" "DisplayVersion" "1.0.0"
+SectionEnd
+
+Section "Uninstall"
+    Delete "$SMPROGRAMS\Medical Lab Analyzer\Medical Lab Analyzer.lnk"
+    RMDir "$SMPROGRAMS\Medical Lab Analyzer"
+    Delete "$DESKTOP\Medical Lab Analyzer.lnk"
+    
+    RMDir /r "$INSTDIR"
+    
+    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\MedicalLabAnalyzer"
+SectionEnd
+"@
+    
+    $nsisScript | Out-File -FilePath ".\installer.nsi" -Encoding UTF8
+    
+    # Check if NSIS is available
+    if (Test-Command "makensis") {
+        makensis installer.nsi
+        Write-ColorOutput "✅ Installer created: MedicalLabAnalyzer-Setup.exe" "Success"
+    }
+    else {
+        Write-ColorOutput "⚠️  NSIS not found. Installer script created: installer.nsi" "Warning"
+    }
+}
+
+function Create-OfflinePackage {
+    Write-ColorOutput "📦 Creating offline package..." "Info"
+    
+    $packageName = "MedicalLabAnalyzer-Offline-$Configuration"
+    $packagePath = ".\$packageName"
+    
+    if (Test-Path $packagePath) {
+        Remove-Item -Path $packagePath -Recurse -Force
+    }
+    
+    # Create package structure
+    New-Item -ItemType Directory -Path $packagePath | Out-Null
+    New-Item -ItemType Directory -Path "$packagePath\Application" | Out-Null
+    New-Item -ItemType Directory -Path "$packagePath\Packages" | Out-Null
+    New-Item -ItemType Directory -Path "$packagePath\Tools" | Out-Null
+    
+    # Copy application
+    Copy-Item -Path "$OutputPath\*" -Destination "$packagePath\Application" -Recurse -Force
+    
+    # Copy packages
+    Copy-Item -Path ".\packages\*" -Destination "$packagePath\Packages" -Recurse -Force
+    
+    # Copy tools
+    if (Test-Path ".\tools") {
+        Copy-Item -Path ".\tools\*" -Destination "$packagePath\Tools" -Recurse -Force
+    }
+    
+    # Create installation script
+    $installScript = @"
+@echo off
+echo Medical Lab Analyzer - Offline Installation
+echo ===========================================
+
+echo Installing packages...
+nuget restore ".\Packages\packages.config" -PackagesDirectory ".\Packages"
+
+echo Copying application...
+xcopy ".\Application\*" "%PROGRAMFILES%\Medical Lab Analyzer\" /E /I /Y
+
+echo Creating shortcuts...
+mklink "%USERPROFILE%\Desktop\Medical Lab Analyzer.lnk" "%PROGRAMFILES%\Medical Lab Analyzer\MedicalLabAnalyzer.exe"
+
+echo Installation complete!
+pause
+"@
+    
+    $installScript | Out-File -FilePath "$packagePath\install.bat" -Encoding ASCII
+    
+    # Create README
+    $readme = @"
+Medical Lab Analyzer - Offline Package
+=====================================
+
+This package contains everything needed to install Medical Lab Analyzer in an offline environment.
+
+Contents:
+- Application: Complete application files
+- Packages: All required NuGet packages
+- Tools: Build and installation tools
+
+Installation:
+1. Run install.bat as Administrator
+2. The application will be installed to Program Files
+3. A desktop shortcut will be created
+
+System Requirements:
+- Windows 10 or later
+- .NET 8.0 Runtime
+- 4GB RAM minimum
+- 2GB free disk space
+
+For support, contact: support@medicallabsolutions.com
+"@
+    
+    $readme | Out-File -FilePath "$packagePath\README.txt" -Encoding UTF8
+    
+    # Create ZIP archive
+    $zipPath = "$packageName.zip"
+    if (Test-Path $zipPath) {
+        Remove-Item -Path $zipPath -Force
+    }
+    
+    Compress-Archive -Path $packagePath -DestinationPath $zipPath
+    
+    Write-ColorOutput "✅ Offline package created: $zipPath" "Success"
+}
+
+function Show-Summary {
+    Write-ColorOutput "`n🎉 Build Summary" "Success"
+    Write-ColorOutput "===============" "Success"
+    Write-ColorOutput "Configuration: $Configuration" "Info"
+    Write-ColorOutput "Platform: $Platform" "Info"
+    Write-ColorOutput "Output Directory: $OutputPath" "Info"
+    Write-ColorOutput "Clean Build: $Clean" "Info"
+    Write-ColorOutput "Tests Skipped: $SkipTests" "Info"
+    Write-ColorOutput "Installer Created: $CreateInstaller" "Info"
+    
+    Write-ColorOutput "`n📁 Generated Files:" "Info"
+    Write-ColorOutput "   Application: $OutputPath" "Info"
+    if ($CreateInstaller) {
+        Write-ColorOutput "   Installer: MedicalLabAnalyzer-Setup.exe" "Info"
+    }
+    Write-ColorOutput "   Offline Package: MedicalLabAnalyzer-Offline-$Configuration.zip" "Info"
+    
+    Write-ColorOutput "`n🚀 Next Steps:" "Info"
+    Write-ColorOutput "   1. Test the application: $OutputPath\MedicalLabAnalyzer.exe" "Info"
+    Write-ColorOutput "   2. Place sample videos in: $OutputPath\Samples\" "Info"
+    Write-ColorOutput "   3. Configure calibration settings" "Info"
+    Write-ColorOutput "   4. Run CASA analysis tests" "Info"
+}
+
+# Main execution
+try {
+    Write-ColorOutput "🏥 Medical Lab Analyzer - Offline Build Script" "Success"
+    Write-ColorOutput "===============================================" "Success"
+    Write-ColorOutput "Configuration: $Configuration" "Info"
+    Write-ColorOutput "Platform: $Platform" "Info"
+    Write-ColorOutput "Output Path: $OutputPath" "Info"
+    Write-ColorOutput ""
+    
+    Test-DotNet
+    Test-NuGet
+    Initialize-Environment
+    Download-Packages
+    Build-Project
+    Run-Tests
+    Create-Database
+    Copy-Files
+    Create-Installer
+    Create-OfflinePackage
+    Show-Summary
+    
+    Write-ColorOutput "`n✅ Build completed successfully!" "Success"
+}
+catch {
+    Write-ColorOutput "`n❌ Build failed: $($_.Exception.Message)" "Error"
+    Write-ColorOutput "Stack trace: $($_.ScriptStackTrace)" "Error"
+    exit 1
+}
