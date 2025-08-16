@@ -47,12 +47,9 @@ jobs:
         iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
         Write-Host "✅ Chocolatey installed successfully"
 
-    - name: Install VC++ Redistributables
-      run: |
-        Write-Host "=== Installing VC++ Redistributables ==="
-        choco install vcredist2019 -y --no-progress
-        choco install vcredist2022 -y --no-progress
-        Write-Host "✅ VC++ Redistributables installed successfully"
+    - name: Ensure VC++ Redistributable (2015-2022)
+      shell: pwsh
+      run: .\scripts\ensure-vcredist.ps1 -Architecture x64 -ContinueOnError
 
     - name: Clear NuGet cache
       run: |
@@ -244,7 +241,12 @@ jobs:
         Set-ExecutionPolicy Bypass -Scope Process -Force
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
         iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-        choco install vcredist2019 vcredist2022 -y --no-progress
+    - name: Ensure VC++ Redistributable (2015-2022)
+      shell: pwsh
+      run: .\scripts\ensure-vcredist.ps1 -Architecture x64 -ContinueOnError
+      
+    - name: Finalize dependency install
+      run: |
         Write-Host "✅ Dependencies installed"
 
     - name: Restore and build
