@@ -1,0 +1,114 @@
+<Project>
+  <PropertyGroup>
+    <!-- Common properties for all projects -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    
+    <!-- Company and copyright information -->
+    <Company>Medical Lab Solutions</Company>
+    <Copyright>Copyright © 2024 Medical Lab Solutions</Copyright>
+    <Product>Medical Lab Analyzer</Product>
+    
+    <!-- Assembly information -->
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
+    
+    <!-- Build configuration -->
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
+    
+    <!-- WPF specific settings -->
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>false</UseWindowsForms>
+    
+    <!-- Code analysis and warnings -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <WarningsNotAsErrors />
+    
+    <!-- Documentation -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <DocumentationFile>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).xml</DocumentationFile>
+    
+    <!-- Debug information -->
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    
+    <!-- Optimization -->
+    <Optimize Condition="'$(Configuration)' == 'Release'">true</Optimize>
+    <Optimize Condition="'$(Configuration)' == 'Debug'">false</Optimize>
+    
+    <!-- Code signing (uncomment if you have a certificate) -->
+    <!-- <SignAssembly>true</SignAssembly> -->
+    <!-- <AssemblyOriginatorKeyFile>key.snk</AssemblyOriginatorKeyFile> -->
+    
+    <!-- Publish settings -->
+    <PublishSingleFile Condition="'$(Configuration)' == 'Release'">true</PublishSingleFile>
+    <SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
+    <RuntimeIdentifier Condition="'$(Configuration)' == 'Release'">win-x64</RuntimeIdentifier>
+    
+    <!-- Code coverage -->
+    <CollectCoverage>false</CollectCoverage>
+    <CoverletOutputFormat>opencover</CoverletOutputFormat>
+    <CoverletOutput>$(MSBuildThisFileDirectory)coverage\</CoverletOutput>
+    
+    <!-- Test settings -->
+    <IsTestProject>false</IsTestProject>
+    <IsTestProject Condition="$(MSBuildProjectName.EndsWith('.Tests'))">true</IsTestProject>
+    
+    <!-- Conditional compilation symbols -->
+    <DefineConstants Condition="'$(Configuration)' == 'Debug'">DEBUG;TRACE</DefineConstants>
+    <DefineConstants Condition="'$(Configuration)' == 'Release'">RELEASE;TRACE</DefineConstants>
+  </PropertyGroup>
+  
+  <!-- Common package references for all projects -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
+  </ItemGroup>
+  
+  <!-- Test project specific settings -->
+  <PropertyGroup Condition="$(IsTestProject)">
+    <TargetFramework>net8.0</TargetFramework>
+    <UseWPF>false</UseWPF>
+    <IsPackable>false</IsPackable>
+    <CollectCoverage>true</CollectCoverage>
+  </PropertyGroup>
+  
+  <!-- Test project package references -->
+  <ItemGroup Condition="$(IsTestProject)">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.6.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.2" />
+    <PackageReference Include="Moq" Version="4.20.69" />
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+  </ItemGroup>
+  
+  <!-- Common build targets -->
+  <Target Name="CleanOutput" BeforeTargets="Clean">
+    <RemoveDir Directories="$(OutputPath)" />
+    <RemoveDir Directories="$(BaseOutputPath)" />
+  </Target>
+  
+  <!-- Copy dependencies to output -->
+  <Target Name="CopyDependencies" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
+    <ItemGroup>
+      <DependencyFiles Include="$(MSBuildThisFileDirectory)Database\**\*" />
+      <DependencyFiles Include="$(MSBuildThisFileDirectory)src\MedicalLabAnalyzer\appsettings.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DependencyFiles)" 
+          DestinationFolder="$(OutputPath)%(RecursiveDir)" />
+  </Target>
+  
+  <!-- Create output directories -->
+  <Target Name="CreateOutputDirectories" BeforeTargets="Build">
+    <MakeDir Directories="$(OutputPath)Database" />
+    <MakeDir Directories="$(OutputPath)logs" />
+    <MakeDir Directories="$(OutputPath)VideoAnalysis" />
+    <MakeDir Directories="$(OutputPath)Reports" />
+  </Target>
+</Project>
