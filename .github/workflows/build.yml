@@ -42,8 +42,12 @@ jobs:
     - name: Build solution
       run: dotnet build MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-restore
       
+    - name: Create test results directory
+      run: New-Item -ItemType Directory -Path "TestResults" -Force
+      shell: pwsh
+      
     - name: Run tests
-      run: dotnet test MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-build --verbosity normal
+      run: dotnet test MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-build --verbosity normal --logger trx --results-directory TestResults
       
     - name: Upload build artifacts (Release only)
       if: matrix.configuration == 'Release'
@@ -60,6 +64,6 @@ jobs:
       with:
         name: test-results-${{ matrix.configuration }}-${{ github.sha }}
         path: |
-          **/*.trx
-          **/*.xml
+          TestResults/**/*.trx
+          TestResults/**/*.xml
         retention-days: 7

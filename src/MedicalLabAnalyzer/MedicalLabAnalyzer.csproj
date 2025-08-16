@@ -6,6 +6,8 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
     <!-- <ApplicationIcon>Resources\app.ico</ApplicationIcon> -->
     <AssemblyTitle>Medical Lab Analyzer</AssemblyTitle>
     <AssemblyDescription>Professional Medical Laboratory Management System with Video Analysis</AssemblyDescription>
@@ -33,6 +35,7 @@
     <!-- EmguCV for Video Analysis -->
     <PackageReference Include="Emgu.CV" Version="4.8.1.5350" />
     <PackageReference Include="Emgu.CV.runtime.windows" Version="4.8.1.5350" />
+    <PackageReference Include="Emgu.CV.Bitmap" Version="4.8.1.5350" />
     
     <!-- Database and ORM -->
     <PackageReference Include="System.Data.SQLite.Core" Version="1.0.118" />
