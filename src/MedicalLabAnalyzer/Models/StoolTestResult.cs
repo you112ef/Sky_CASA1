@@ -1,318 +1,108 @@
+using System;
+using System.ComponentModel.DataAnnotations;
+
 namespace MedicalLabAnalyzer.Models
 {
     public class StoolTestResult
     {
+        [Key]
         public int Id { get; set; }
+        
+        [Required]
         public int ExamId { get; set; }
         
         // Physical Properties
-        public string Color { get; set; } // بني، أسود، أحمر، أخضر، أصفر، أبيض
-        public string Consistency { get; set; } // صلب، طري، سائل، مائي
-        public string Shape { get; set; } // طبيعي، رقيق، كرات، قطع صغيرة
-        public double Weight { get; set; } // بالجرام
-        public string Odor { get; set; } // طبيعي، كريه، حامضي
+        public string Color { get; set; } // Brown, Black, Green, Yellow, etc.
+        public string Consistency { get; set; } // Formed, Soft, Liquid, Hard
+        public string Odor { get; set; } // Normal, Foul, etc.
+        public double? Quantity { get; set; } // grams
+        public string Blood { get; set; } // None, Visible, Occult
+        public string Mucus { get; set; } // None, Present
+        public string Pus { get; set; } // None, Present
         
         // Chemical Tests
-        public string OccultBlood { get; set; } // Negative, Positive, Weak Positive
-        public string pH { get; set; } // 6.0-7.5
+        public string OccultBlood { get; set; } // Negative, Positive
         public string ReducingSubstances { get; set; } // Negative, Positive
-        public string FatContent { get; set; } // Normal, Increased, Decreased
+        public string pH { get; set; } // Acidic, Neutral, Alkaline
+        public double? pHValue { get; set; }
+        public string Fat { get; set; } // Negative, Positive
+        public string Protein { get; set; } // Negative, Positive
         
         // Microscopic Examination
-        public string Mucus { get; set; } // None, Present, Abundant
-        public string UndigestedFood { get; set; } // None, Present, Abundant
-        public string MuscleFibers { get; set; } // None, Present, Abundant
-        public string Starch { get; set; } // None, Present, Abundant
-        public string FatGlobules { get; set; } // None, Present, Abundant
+        public int? RBC { get; set; } // per HPF
+        public int? WBC { get; set; } // per HPF
+        public int? EpithelialCells { get; set; } // per HPF
+        public int? Macrophages { get; set; } // per HPF
+        public int? Eosinophils { get; set; } // per HPF
         
-        // Parasitology
+        // Parasites
         public string Parasites { get; set; } // None, Present
-        public string ParasiteType { get; set; } // Giardia, Entamoeba, Ascaris, etc.
-        public int ParasiteCount { get; set; } // Number of parasites found
-        public string Ova { get; set; } // None, Present
-        public string OvaType { get; set; } // Type of eggs found
-        public int OvaCount { get; set; } // Number of eggs found
+        public string ParasiteType { get; set; } // Giardia, Entamoeba, etc.
+        public int? ParasiteCount { get; set; } // per HPF
+        public string ParasiteStage { get; set; } // Cyst, Trophozoite, Egg, etc.
         
-        // Bacteria and Culture
-        public string Bacteria { get; set; } // Normal, Abnormal
-        public string BacterialType { get; set; } // Type of bacteria found
+        // Ova and Parasites
+        public string Ova { get; set; } // None, Present
+        public string OvaType { get; set; } // Ascaris, Hookworm, etc.
+        public int? OvaCount { get; set; } // per HPF
+        
+        // Bacteria
+        public string Bacteria { get; set; } // Normal Flora, Abnormal
+        public string BacterialType { get; set; } // E. coli, Salmonella, etc.
+        public int? BacterialCount { get; set; } // per HPF
+        
+        // Yeast and Fungi
         public string Yeast { get; set; } // None, Present
-        public string YeastType { get; set; } // Type of yeast found
+        public string YeastType { get; set; } // Candida, etc.
+        public int? YeastCount { get; set; } // per HPF
+        
+        // Undigested Food
+        public string UndigestedFood { get; set; } // None, Present
+        public string FoodType { get; set; } // Meat, Vegetable, etc.
+        
+        // Fat Globules
+        public string FatGlobules { get; set; } // None, Present
+        public int? FatGlobuleCount { get; set; } // per HPF
+        
+        // Muscle Fibers
+        public string MuscleFibers { get; set; } // None, Present
+        public int? MuscleFiberCount { get; set; } // per HPF
+        
+        // Starch Granules
+        public string StarchGranules { get; set; } // None, Present
+        public int? StarchGranuleCount { get; set; } // per HPF
         
         // Additional Tests
-        public string Calprotectin { get; set; } // Normal, Elevated, High
-        public double CalprotectinValue { get; set; } // µg/g
-        public string Lactoferrin { get; set; } // Negative, Positive
-        public string Alpha1Antitrypsin { get; set; } // Normal, Elevated
+        public string Calprotectin { get; set; } // Normal, Elevated
+        public double? CalprotectinValue { get; set; } // μg/g
+        public string Lactoferrin { get; set; } // Normal, Elevated
+        public double? LactoferrinValue { get; set; } // μg/g
         
-        // Clinical Information
-        public DateTime TestDate { get; set; }
-        public string CollectionMethod { get; set; } // Spontaneous, Induced
-        public string PatientPreparation { get; set; } // Fasting, Normal diet, Special diet
-        public string Notes { get; set; }
-        public string Status { get; set; } // Normal, Abnormal, Critical
-        public string Technician { get; set; }
+        // Culture and Sensitivity
+        public string CultureResult { get; set; } // No Growth, Mixed Flora, etc.
+        public string PathogenicOrganism { get; set; }
+        public string Sensitivity { get; set; } // Sensitive, Resistant, Intermediate
+        
+        // Quality Control
+        public bool IsQualityControlPassed { get; set; } = false;
+        public string QualityControlNotes { get; set; }
+        
+        // Results Interpretation
+        public string Interpretation { get; set; } // Normal, Abnormal, Borderline
+        public string ClinicalSignificance { get; set; }
+        public string Recommendations { get; set; }
+        
+        // Analysis Details
+        public DateTime AnalysisDate { get; set; } = DateTime.Now;
+        public string AnalyzedBy { get; set; }
         public string VerifiedBy { get; set; }
-
-        public StoolTestResult()
-        {
-            TestDate = DateTime.Now;
-            Status = "Normal";
-            
-            // Default physical properties
-            Color = "بني";
-            Consistency = "طبيعي";
-            Shape = "طبيعي";
-            Weight = 100.0; // grams
-            Odor = "طبيعي";
-            
-            // Default chemical tests
-            OccultBlood = "Negative";
-            pH = "6.5";
-            ReducingSubstances = "Negative";
-            FatContent = "Normal";
-            
-            // Default microscopic examination
-            Mucus = "None";
-            UndigestedFood = "None";
-            MuscleFibers = "None";
-            Starch = "None";
-            FatGlobules = "None";
-            
-            // Default parasitology
-            Parasites = "None";
-            ParasiteType = "";
-            ParasiteCount = 0;
-            Ova = "None";
-            OvaType = "";
-            OvaCount = 0;
-            
-            // Default bacteria and culture
-            Bacteria = "Normal";
-            BacterialType = "";
-            Yeast = "None";
-            YeastType = "";
-            
-            // Default additional tests
-            Calprotectin = "Normal";
-            CalprotectinValue = 0.0;
-            Lactoferrin = "Negative";
-            Alpha1Antitrypsin = "Normal";
-            
-            // Default clinical information
-            CollectionMethod = "Spontaneous";
-            PatientPreparation = "Normal diet";
-        }
-
-        /// <summary>
-        /// التحقق من القيم المرجعية وتحديد الحالة
-        /// </summary>
-        public void ValidateResults()
-        {
-            var abnormalCount = 0;
-            
-            // Physical properties - check for abnormal colors
-            if (Color == "أسود" || Color == "أحمر" || Color == "أبيض")
-                abnormalCount++;
-            
-            // Consistency - check for abnormal consistency
-            if (Consistency == "سائل" || Consistency == "مائي")
-                abnormalCount++;
-            
-            // Chemical tests
-            if (OccultBlood != "Negative")
-                abnormalCount++;
-            
-            if (ReducingSubstances == "Positive")
-                abnormalCount++;
-            
-            if (FatContent == "Increased")
-                abnormalCount++;
-            
-            // Microscopic examination
-            if (Mucus == "Present" || Mucus == "Abundant")
-                abnormalCount++;
-            
-            if (UndigestedFood == "Abundant")
-                abnormalCount++;
-            
-            if (MuscleFibers == "Abundant")
-                abnormalCount++;
-            
-            if (Starch == "Abundant")
-                abnormalCount++;
-            
-            if (FatGlobules == "Present" || FatGlobules == "Abundant")
-                abnormalCount++;
-            
-            // Parasitology
-            if (Parasites == "Present")
-                abnormalCount++;
-            
-            if (Ova == "Present")
-                abnormalCount++;
-            
-            // Bacteria and culture
-            if (Bacteria == "Abnormal")
-                abnormalCount++;
-            
-            if (Yeast == "Present")
-                abnormalCount++;
-            
-            // Additional tests
-            if (Calprotectin == "Elevated" || Calprotectin == "High")
-                abnormalCount++;
-            
-            if (Lactoferrin == "Positive")
-                abnormalCount++;
-            
-            if (Alpha1Antitrypsin == "Elevated")
-                abnormalCount++;
-            
-            // تحديد الحالة
-            if (abnormalCount == 0)
-                Status = "Normal";
-            else if (abnormalCount <= 3)
-                Status = "Abnormal";
-            else
-                Status = "Critical";
-        }
-
-        /// <summary>
-        /// الحصول على ملخص النتائج
-        /// </summary>
-        public string GetSummary()
-        {
-            var summary = $"Color: {Color}, Consistency: {Consistency}, Occult Blood: {OccultBlood}";
-            
-            var abnormalFindings = new List<string>();
-            
-            if (OccultBlood != "Negative")
-                abnormalFindings.Add($"Occult Blood: {OccultBlood}");
-            
-            if (Parasites == "Present")
-                abnormalFindings.Add($"Parasites: {ParasiteType}");
-            
-            if (Ova == "Present")
-                abnormalFindings.Add($"Ova: {OvaType}");
-            
-            if (Bacteria == "Abnormal")
-                abnormalFindings.Add($"Bacteria: {BacterialType}");
-            
-            if (Calprotectin == "Elevated" || Calprotectin == "High")
-                abnormalFindings.Add($"Calprotectin: {CalprotectinValue:F1} µg/g");
-            
-            if (abnormalFindings.Count > 0)
-                summary += $", Abnormal: {string.Join(", ", abnormalFindings)}";
-            
-            summary += $", Status: {Status}";
-            return summary;
-        }
-
-        /// <summary>
-        /// الحصول على القيم غير الطبيعية
-        /// </summary>
-        public List<string> GetAbnormalValues()
-        {
-            var abnormal = new List<string>();
-            
-            // Physical properties
-            if (Color == "أسود")
-                abnormal.Add("Color: أسود (قد يشير إلى نزيف في الجهاز الهضمي العلوي)");
-            
-            if (Color == "أحمر")
-                abnormal.Add("Color: أحمر (قد يشير إلى نزيف في الجهاز الهضمي السفلي)");
-            
-            if (Color == "أبيض")
-                abnormal.Add("Color: أبيض (قد يشير إلى مشاكل في الكبد أو المرارة)");
-            
-            if (Consistency == "سائل" || Consistency == "مائي")
-                abnormal.Add($"Consistency: {Consistency} (قد يشير إلى إسهال)");
-            
-            // Chemical tests
-            if (OccultBlood != "Negative")
-                abnormal.Add($"Occult Blood: {OccultBlood} (قد يشير إلى نزيف في الجهاز الهضمي)");
-            
-            if (ReducingSubstances == "Positive")
-                abnormal.Add("Reducing Substances: Positive (قد يشير إلى سوء امتصاص الكربوهيدرات)");
-            
-            if (FatContent == "Increased")
-                abnormal.Add("Fat Content: Increased (قد يشير إلى سوء امتصاص الدهون)");
-            
-            // Microscopic examination
-            if (Mucus == "Present" || Mucus == "Abundant")
-                abnormal.Add($"Mucus: {Mucus} (قد يشير إلى التهاب في الأمعاء)");
-            
-            if (UndigestedFood == "Abundant")
-                abnormal.Add("Undigested Food: Abundant (قد يشير إلى مشاكل في الهضم)");
-            
-            if (FatGlobules == "Present" || FatGlobules == "Abundant")
-                abnormal.Add($"Fat Globules: {FatGlobules} (قد يشير إلى سوء امتصاص الدهون)");
-            
-            // Parasitology
-            if (Parasites == "Present")
-                abnormal.Add($"Parasites: {ParasiteType} (يتطلب علاج)");
-            
-            if (Ova == "Present")
-                abnormal.Add($"Ova: {OvaType} (يتطلب علاج)");
-            
-            // Bacteria and culture
-            if (Bacteria == "Abnormal")
-                abnormal.Add($"Bacteria: {BacterialType} (قد يشير إلى عدوى)");
-            
-            if (Yeast == "Present")
-                abnormal.Add($"Yeast: {YeastType} (قد يشير إلى عدوى فطرية)");
-            
-            // Additional tests
-            if (Calprotectin == "Elevated" || Calprotectin == "High")
-                abnormal.Add($"Calprotectin: {CalprotectinValue:F1} µg/g (قد يشير إلى التهاب في الأمعاء)");
-            
-            if (Lactoferrin == "Positive")
-                abnormal.Add("Lactoferrin: Positive (قد يشير إلى التهاب في الأمعاء)");
-            
-            return abnormal;
-        }
-
-        /// <summary>
-        /// التحقق من وجود نزيف في الجهاز الهضمي
-        /// </summary>
-        public bool HasGastrointestinalBleeding()
-        {
-            return (OccultBlood != "Negative" || Color == "أسود" || Color == "أحمر");
-        }
-
-        /// <summary>
-        /// التحقق من وجود عدوى طفيلية
-        /// </summary>
-        public bool HasParasiticInfection()
-        {
-            return (Parasites == "Present" || Ova == "Present");
-        }
-
-        /// <summary>
-        /// التحقق من وجود التهاب في الأمعاء
-        /// </summary>
-        public bool HasInflammatoryBowelDisease()
-        {
-            return (Calprotectin == "Elevated" || Calprotectin == "High" || 
-                    Lactoferrin == "Positive" || Mucus == "Present" || Mucus == "Abundant");
-        }
-
-        /// <summary>
-        /// التحقق من وجود سوء امتصاص
-        /// </summary>
-        public bool HasMalabsorption()
-        {
-            return (FatContent == "Increased" || FatGlobules == "Present" || 
-                    FatGlobules == "Abundant" || ReducingSubstances == "Positive");
-        }
-
-        /// <summary>
-        /// التحقق من وجود إسهال
-        /// </summary>
-        public bool HasDiarrhea()
-        {
-            return (Consistency == "سائل" || Consistency == "مائي");
-        }
+        public DateTime? VerificationDate { get; set; }
+        
+        public string Comments { get; set; }
+        public DateTime CreatedDate { get; set; } = DateTime.Now;
+        public DateTime? ModifiedDate { get; set; }
+        
+        // Navigation Properties
+        public virtual Exam Exam { get; set; }
     }
 }
