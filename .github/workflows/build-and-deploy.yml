@@ -47,17 +47,20 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
+    - name: Clear NuGet cache
+      run: dotnet nuget locals all --clear
+
     - name: Restore dependencies
-      run: dotnet restore ${{ env.SOLUTION_FILE }}
+      run: dotnet restore ${{ env.PROJECT_FILE }} --verbosity normal
 
     - name: Build solution
       run: |
-        dotnet build ${{ env.SOLUTION_FILE }} --configuration ${{ github.event.inputs.build_type || 'Release' }} --no-restore
-        dotnet build ${{ env.SOLUTION_FILE }} --configuration ${{ github.event.inputs.build_type || 'Release' }} --no-restore --verbosity detailed
+        dotnet build ${{ env.PROJECT_FILE }} --configuration ${{ github.event.inputs.build_type || 'Release' }} --no-restore --verbosity normal
+        dotnet build ${{ env.PROJECT_FILE }} --configuration ${{ github.event.inputs.build_type || 'Release' }} --no-restore --verbosity detailed
 
     - name: Run tests
       if: ${{ github.event.inputs.run_tests != false }}
-      run: dotnet test ${{ env.SOLUTION_FILE }} --configuration ${{ github.event.inputs.build_type || 'Release' }} --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
+      run: dotnet test ${{ env.PROJECT_FILE }} --configuration ${{ github.event.inputs.build_type || 'Release' }} --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
 
     - name: Upload test results
       if: ${{ github.event.inputs.run_tests != false }}
@@ -84,10 +87,10 @@ jobs:
         Copy-Item -Path "$publishPath/*" -Destination "$distPath/$packageName/" -Recurse -Force
         
         # نسخ ملفات إضافية
-        Copy-Item -Path "README.md" -Destination "$distPath/$packageName/" -Force
-        Copy-Item -Path "INSTALLATION_GUIDE.md" -Destination "$distPath/$packageName/" -Force
-        Copy-Item -Path "QUICK_START.md" -Destination "$distPath/$packageName/" -Force
-        Copy-Item -Path "CHANGELOG.txt" -Destination "$distPath/$packageName/" -Force
+        Copy-Item -Path "README.md" -Destination "$distPath/$packageName/" -Force -ErrorAction SilentlyContinue
+        Copy-Item -Path "INSTALLATION_GUIDE.md" -Destination "$distPath/$packageName/" -Force -ErrorAction SilentlyContinue
+        Copy-Item -Path "QUICK_START.md" -Destination "$distPath/$packageName/" -Force -ErrorAction SilentlyContinue
+        Copy-Item -Path "CHANGELOG.txt" -Destination "$distPath/$packageName/" -Force -ErrorAction SilentlyContinue
         
         # إنشاء ملف appsettings.json
         @"
@@ -241,9 +244,11 @@ Branch: ${{ github.ref_name }}
 
     - name: Security scan
       run: |
-        Write-Host "Running security scan..."
-        # هنا يمكن إضافة أدوات فحص الأمان
-        # مثال: dotnet list package --vulnerable
+        Write-Host "Running security vulnerability scan..."
+        dotnet list package --vulnerable
+        
+        Write-Host "Checking for known security issues..."
+        # هنا يمكن إضافة فحص الأمان
 
     - name: Upload security report
       uses: actions/upload-artifact@v4
