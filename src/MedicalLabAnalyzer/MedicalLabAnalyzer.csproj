@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
-    <!-- <ApplicationIcon>Resources\app.ico</ApplicationIcon> -->
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
     <AssemblyTitle>Medical Lab Analyzer</AssemblyTitle>
     <AssemblyDescription>Professional Medical Laboratory Management System with Video Analysis</AssemblyDescription>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
@@ -21,14 +21,25 @@
     <EmguCVLinkTarget>x64</EmguCVLinkTarget>
     <EmguCVNativeFileSkip>false</EmguCVNativeFileSkip>
     <EmguCVErrorOnMissingRuntime>true</EmguCVErrorOnMissingRuntime>
+    
+    <!-- Build optimizations -->
+    <Optimize>true</Optimize>
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    
+    <!-- Package management optimization -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="$(ContinuousIntegrationBuild) == 'true'">true</RestoreLockedMode>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <Optimize>false</Optimize>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <DefineConstants>CRYSTAL</DefineConstants>
+    <DefineConstants>RELEASE;TRACE</DefineConstants>
+    <Optimize>true</Optimize>
   </PropertyGroup>
 
   <ItemGroup>
@@ -43,8 +54,8 @@
     <!-- EmguCV for Video Analysis - Optimized for x64 Windows only -->
     <PackageReference Include="Emgu.CV" Version="4.8.1.5350" />
     <PackageReference Include="Emgu.CV.Bitmap" Version="4.8.1.5350" />
-    <!-- Only include x64 runtime to reduce download size -->
     <PackageReference Include="Emgu.CV.runtime.windows" Version="4.8.1.5350" />
+    <PackageReference Include="Emgu.CV.runtime.windows.msvc.rt.x64" Version="19.37.32825" />
     
     <!-- Database and ORM -->
     <PackageReference Include="System.Data.SQLite.Core" Version="1.0.118" />
@@ -59,7 +70,7 @@
     <!-- JSON Support -->
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     
-    <!-- Logging and Configuration (Core logging inherited from Directory.Build.props) -->
+    <!-- Logging and Configuration -->
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
@@ -68,10 +79,10 @@
     <PackageReference Include="FluentValidation" Version="11.8.1" />
     <PackageReference Include="AutoMapper" Version="12.0.1" />
     
-    <!-- Optional: Excel Export -->
+    <!-- Excel Export -->
     <PackageReference Include="EPPlus" Version="7.0.5" />
     
-    <!-- Optional: MVVM Framework -->
+    <!-- MVVM Framework -->
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
   </ItemGroup>
 
@@ -99,13 +110,36 @@
     </None>
   </ItemGroup>
 
+  <!-- EmguCV Runtime Deployment -->
+  <ItemGroup>
+    <ContentWithTargetPath Include="$(NuGetPackageRoot)emgu.cv.runtime.windows\4.8.1.5350\runtimes\win-x64\native\*.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>%(Filename)%(Extension)</TargetPath>
+    </ContentWithTargetPath>
+    <ContentWithTargetPath Include="$(NuGetPackageRoot)emgu.cv.runtime.windows.msvc.rt.x64\19.37.32825\runtimes\win-x64\native\*.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>%(Filename)%(Extension)</TargetPath>
+    </ContentWithTargetPath>
+  </ItemGroup>
+
   <!-- Custom target to validate EmguCV dependencies -->
   <Target Name="ValidateEmguCVDependencies" AfterTargets="Restore">
     <Message Text="Validating EmguCV dependencies for x64 runtime..." Importance="high" />
     <ItemGroup>
       <EmguCVFiles Include="$(NuGetPackageRoot)emgu.cv.runtime.windows\**\runtimes\win-x64\**\*.dll" />
     </ItemGroup>
-    <Message Text="Found @(EmguCVFiles-&gt;Count()) EmguCV runtime files" Importance="high" />
+    <Message Text="Found @(EmguCVFiles->Count()) EmguCV runtime files" Importance="high" />
+  </Target>
+
+  <!-- Post-build copy for EmguCV -->
+  <Target Name="CopyEmguCVRuntime" AfterTargets="Build">
+    <ItemGroup>
+      <EmguCVRuntimeFiles Include="$(NuGetPackageRoot)emgu.cv.runtime.windows\**\runtimes\win-x64\native\*.dll" />
+      <EmguCVRuntimeFiles Include="$(NuGetPackageRoot)emgu.cv.runtime.windows.msvc.rt.x64\**\runtimes\win-x64\native\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(EmguCVRuntimeFiles)" 
+          DestinationFolder="$(OutputPath)" />
+    <Message Text="Copied @(EmguCVRuntimeFiles->Count()) EmguCV runtime files to output" Importance="high" />
   </Target>
 
 </Project>
