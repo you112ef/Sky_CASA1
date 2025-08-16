@@ -2,16 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using System.Data;
+using Dapper;
+using System.Linq;
 
 namespace MedicalLabAnalyzer.Services
 {
     public class CalibrationService
     {
         private readonly ILogger<CalibrationService> _logger;
+        private readonly IDbConnection _db;
 
-        public CalibrationService(ILogger<CalibrationService> logger = null)
+        public CalibrationService(ILogger<CalibrationService> logger = null, IDbConnection dbConnection = null)
         {
             _logger = logger;
+            _db = dbConnection;
         }
 
         public async Task<CalibrationResult> CalibrateMicroscopeAsync(CalibrationParameters parameters)
@@ -190,15 +195,17 @@ namespace MedicalLabAnalyzer.Services
                     INSERT INTO Calibration (Id, CalibrationDate, MicroscopeMagnification, CameraPixelSize, 
                                            ReferenceObjectSize, CalibrationFactor, PixelSize, Accuracy, 
                                            Status, Notes, CreatedAt)
-                    VALUES (@Id, @CalibrationDate, @Parameters.MicroscopeMagnification, @Parameters.CameraPixelSize,
-                           @Parameters.ReferenceObjectSize, @CalibrationFactor, @PixelSize, @Accuracy,
+                    VALUES (@Id, @CalibrationDate, @MicroscopeMagnification, @CameraPixelSize,
+                           @ReferenceObjectSize, @CalibrationFactor, @PixelSize, @Accuracy,
                            @Status, @Notes, @CreatedAt)";
                 
                 var parameters = new
                 {
                     result.Id,
                     result.CalibrationDate,
-                    result.Parameters,
+                    MicroscopeMagnification = result.Parameters.MicroscopeMagnification,
+                    CameraPixelSize = result.Parameters.CameraPixelSize,
+                    ReferenceObjectSize = result.Parameters.ReferenceObjectSize,
                     result.CalibrationFactor,
                     result.PixelSize,
                     result.Accuracy,
@@ -236,12 +243,17 @@ namespace MedicalLabAnalyzer.Services
 
     public class CalibrationResult
     {
+        public string Id { get; set; }
         public string DeviceType { get; set; }
         public bool IsValid { get; set; }
         public DateTime CalibrationDate { get; set; }
         public DateTime ExpiryDate { get; set; }
         public string Status { get; set; }
         public string Notes { get; set; }
+        public CalibrationParameters Parameters { get; set; }
+        public double CalibrationFactor { get; set; }
+        public double PixelSize { get; set; }
+        public double Accuracy { get; set; }
     }
 
     public class CalibrationHistory
@@ -252,5 +264,12 @@ namespace MedicalLabAnalyzer.Services
         public string PerformedBy { get; set; }
         public string Status { get; set; }
         public string Notes { get; set; }
+    }
+
+    public class CalibrationParameters
+    {
+        public double MicroscopeMagnification { get; set; }
+        public double CameraPixelSize { get; set; }
+        public double ReferenceObjectSize { get; set; }
     }
 }

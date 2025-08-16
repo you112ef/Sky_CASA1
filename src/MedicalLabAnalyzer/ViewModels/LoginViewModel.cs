@@ -7,6 +7,8 @@ using System.Windows;
 using System.Windows.Input;
 using MedicalLabAnalyzer.Models;
 using MedicalLabAnalyzer.Services;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace MedicalLabAnalyzer.ViewModels
 {
@@ -23,11 +25,17 @@ namespace MedicalLabAnalyzer.ViewModels
         private bool _isLoading = false;
         private UserRole _selectedRole;
         
-        public LoginViewModel()
+        public LoginViewModel(IConfiguration configuration = null, ILogger<LoginViewModel> logger = null)
         {
-            _authService = new AuthService();
-            _userService = new UserService();
-            _auditLogger = new AuditLogger();
+            // إنشاء database connection factories
+            var connectionFactory = new DatabaseConnectionFactory(configuration, null);
+            var contextFactory = new MedicalLabContextFactory(configuration, null);
+            var dbConnection = connectionFactory.CreateConnection();
+            var context = contextFactory.CreateContext();
+            
+            _authService = new AuthService(null, context);
+            _userService = new UserService(null, dbConnection);
+            _auditLogger = new AuditLogger(null, dbConnection);
             
             LoginCommand = new RelayCommand(async () => await LoginAsync(), () => CanLogin);
             AvailableRoles = new ObservableCollection<UserRole>
@@ -126,11 +134,11 @@ namespace MedicalLabAnalyzer.ViewModels
                 if (loginResult.IsSuccess)
                 {
                     // تسجيل الحدث في AuditLog
-                    await _auditLogger.LogAsync(
-                        EventType.UserLogin,
-                        $"تسجيل دخول ناجح للمستخدم: {Username}",
+                    await _auditLogger.LogUserActionAsync(
+                        loginResult.User?.Id.ToString() ?? "0",
                         Username,
-                        loginResult.User?.Id ?? 0
+                        "UserLogin",
+                        $"تسجيل دخول ناجح للمستخدم: {Username}"
                     );
                     
                     // فتح النافذة الرئيسية
@@ -146,11 +154,11 @@ namespace MedicalLabAnalyzer.ViewModels
                     ErrorMessage = loginResult.ErrorMessage;
                     
                     // تسجيل محاولة تسجيل دخول فاشلة
-                    await _auditLogger.LogAsync(
-                        EventType.LoginFailed,
-                        $"محاولة تسجيل دخول فاشلة للمستخدم: {Username}",
+                    await _auditLogger.LogUserActionAsync(
+                        "0",
                         Username,
-                        0
+                        "LoginFailed",
+                        $"محاولة تسجيل دخول فاشلة للمستخدم: {Username}"
                     );
                 }
             }
@@ -158,11 +166,11 @@ namespace MedicalLabAnalyzer.ViewModels
             {
                 ErrorMessage = $"خطأ في النظام: {ex.Message}";
                 
-                await _auditLogger.LogAsync(
-                    EventType.SystemError,
-                    $"خطأ في تسجيل الدخول: {ex.Message}",
+                await _auditLogger.LogSystemEventAsync(
+                    "0",
                     Username,
-                    0
+                    "SystemError",
+                    $"خطأ في تسجيل الدخول: {ex.Message}"
                 );
             }
             finally

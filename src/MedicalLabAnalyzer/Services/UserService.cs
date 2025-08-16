@@ -2,21 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using System.Linq; // Added for .ToList()
-using MedicalLabAnalyzer.Models; // Added for User model
-using MedicalLabAnalyzer.Data; // Added for _db
+using System.Linq;
+using MedicalLabAnalyzer.Models;
+using System.Data;
+using Dapper;
 
 namespace MedicalLabAnalyzer.Services
 {
     public class UserService
     {
         private readonly ILogger<UserService> _logger;
-        private readonly IDbService _db; // Added for database access
+        private readonly IDbConnection _db;
 
-        public UserService(ILogger<UserService> logger = null, IDbService db = null)
+        public UserService(ILogger<UserService> logger = null, IDbConnection dbConnection = null)
         {
             _logger = logger;
-            _db = db; // Initialize _db
+            _db = dbConnection;
         }
 
         public async Task<User> GetUserByIdAsync(int userId)

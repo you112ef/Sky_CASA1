@@ -22,7 +22,9 @@ namespace MedicalLabAnalyzer.Data
         {
             try
             {
-                _logger.LogInformation("Starting database seeding...");
+                _logger.LogWarning("DEVELOPMENT ONLY: Starting database seeding with test data...");
+                _logger.LogWarning("WARNING: This seeder contains fake patient data and default passwords.");
+                _logger.LogWarning("DO NOT USE IN PRODUCTION without changing all passwords and removing test data!");
 
                 // Check if data already exists
                 if (_context.Users.Any() || _context.Patients.Any() || _context.Exams.Any())
@@ -36,7 +38,7 @@ namespace MedicalLabAnalyzer.Data
                 await SeedExamsAsync();
 
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Database seeding completed successfully.");
+                _logger.LogWarning("Database seeding completed. REMEMBER: Change all default passwords before production use!");
             }
             catch (Exception ex)
             {
@@ -47,7 +49,7 @@ namespace MedicalLabAnalyzer.Data
 
         private async Task SeedUsersAsync()
         {
-            _logger.LogInformation("Seeding users...");
+            _logger.LogWarning("DEVELOPMENT ONLY: Seeding test users with default passwords...");
 
             var users = new[]
             {
@@ -103,26 +105,27 @@ namespace MedicalLabAnalyzer.Data
                 }
             };
 
-            // Set passwords for all users
+            // Set passwords for all users - THESE ARE DEFAULT PASSWORDS FOR DEVELOPMENT ONLY!
             foreach (var user in users)
             {
                 if (user.Username == "admin")
                 {
-                    user.SetPassword("Admin@123");
+                    user.SetPassword("Admin@123"); // CHANGE THIS IN PRODUCTION!
+                    _logger.LogWarning("Created admin user with default password: Admin@123 - CHANGE IMMEDIATELY!");
                 }
                 else
                 {
-                    user.SetPassword("Password@123");
+                    user.SetPassword("Password@123"); // CHANGE THIS IN PRODUCTION!
                 }
             }
 
             await _context.Users.AddRangeAsync(users);
-            _logger.LogInformation("Seeded {Count} users", users.Length);
+            _logger.LogWarning("Seeded {Count} test users with DEFAULT PASSWORDS - Change in production!", users.Length);
         }
 
         private async Task SeedPatientsAsync()
         {
-            _logger.LogInformation("Seeding patients...");
+            _logger.LogWarning("DEVELOPMENT ONLY: Seeding FAKE patient data - Remove in production!");
 
             var patients = new[]
             {
@@ -204,12 +207,12 @@ namespace MedicalLabAnalyzer.Data
             };
 
             await _context.Patients.AddRangeAsync(patients);
-            _logger.LogInformation("Seeded {Count} patients", patients.Length);
+            _logger.LogWarning("Seeded {Count} FAKE patients - This is test data only! Remove before production!", patients.Length);
         }
 
         private async Task SeedExamsAsync()
         {
-            _logger.LogInformation("Seeding exams...");
+            _logger.LogWarning("DEVELOPMENT ONLY: Seeding fake exam data - Remove in production!");
 
             var patients = _context.Patients.ToList();
             var users = _context.Users.ToList();
@@ -283,7 +286,7 @@ namespace MedicalLabAnalyzer.Data
             }
 
             await _context.Exams.AddRangeAsync(exams);
-            _logger.LogInformation("Seeded {Count} exams", exams.Count);
+            _logger.LogWarning("Seeded {Count} FAKE exams - This is test data only! Remove before production!", exams.Count);
         }
 
         public async Task ClearAllDataAsync()

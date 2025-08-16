@@ -1,29 +1,133 @@
 using System;
 using System.Collections.Generic;
+using BCrypt.Net;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MedicalLabAnalyzer.Models
 {
     public class User
     {
         public int Id { get; set; }
+        
+        [Required]
+        [StringLength(50)]
         public string Username { get; set; }
+        
+        [StringLength(100)]
         public string FirstName { get; set; }
+        
+        [StringLength(100)]
         public string LastName { get; set; }
+        
+        [EmailAddress]
+        [StringLength(200)]
         public string Email { get; set; }
+        
+        [Required]
         public string PasswordHash { get; set; }
+        
+        [StringLength(50)]
+        public string Role { get; set; } = "User";
+        
         public int RoleId { get; set; }
-        public bool IsActive { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
+        public bool IsActive { get; set; } = true;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
         public DateTime? LastLoginAt { get; set; }
+        
+        [Phone]
+        [StringLength(20)]
         public string PhoneNumber { get; set; }
+        
+        [StringLength(100)]
         public string Department { get; set; }
+        
+        [StringLength(100)]
         public string Position { get; set; }
+        
+        [StringLength(50)]
         public string EmployeeId { get; set; }
+        
         public string ProfileImagePath { get; set; }
         public Dictionary<string, object> Preferences { get; set; } = new Dictionary<string, object>();
         public List<string> Permissions { get; set; } = new List<string>();
+        
+        // Security fields
+        public int FailedLoginAttempts { get; set; } = 0;
+        public DateTime? AccountLockedAt { get; set; }
+        public DateTime? AccountLockedUntil { get; set; }
+        public DateTime? PasswordChangedAt { get; set; }
+        public bool RequirePasswordChange { get; set; } = false;
+        
+        [NotMapped]
         public string FullName => $"{FirstName} {LastName}".Trim();
+        
+        // Password methods
+        public void SetPassword(string password)
+        {
+            if (string.IsNullOrEmpty(password))
+                throw new ArgumentException("Password cannot be empty");
+                
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, 12); // Use cost factor 12 for security
+            PasswordChangedAt = DateTime.UtcNow;
+            RequirePasswordChange = false;
+            UpdatedAt = DateTime.UtcNow;
+        }
+        
+        public bool VerifyPassword(string password)
+        {
+            if (string.IsNullOrEmpty(password) || string.IsNullOrEmpty(PasswordHash))
+                return false;
+                
+            try
+            {
+                return BCrypt.Net.BCrypt.Verify(password, PasswordHash);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        
+        public bool IsAccountLocked()
+        {
+            return AccountLockedUntil.HasValue && AccountLockedUntil > DateTime.UtcNow;
+        }
+        
+        public void LockAccount(int lockoutMinutes = 30, string reason = "Too many failed login attempts")
+        {
+            AccountLockedAt = DateTime.UtcNow;
+            AccountLockedUntil = DateTime.UtcNow.AddMinutes(lockoutMinutes);
+            UpdatedAt = DateTime.UtcNow;
+        }
+        
+        public void UnlockAccount()
+        {
+            AccountLockedAt = null;
+            AccountLockedUntil = null;
+            FailedLoginAttempts = 0;
+            UpdatedAt = DateTime.UtcNow;
+        }
+        
+        public void RecordFailedLogin()
+        {
+            FailedLoginAttempts++;
+            UpdatedAt = DateTime.UtcNow;
+            
+            // Lock account after 5 failed attempts
+            if (FailedLoginAttempts >= 5)
+            {
+                LockAccount();
+            }
+        }
+        
+        public void RecordSuccessfulLogin()
+        {
+            LastLoginAt = DateTime.UtcNow;
+            FailedLoginAttempts = 0;
+            UpdatedAt = DateTime.UtcNow;
+        }
     }
 
     public class Role

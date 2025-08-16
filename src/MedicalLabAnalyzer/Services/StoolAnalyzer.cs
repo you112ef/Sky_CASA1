@@ -5,6 +5,10 @@ using MedicalLabAnalyzer.Models;
 using Microsoft.Extensions.Logging;
 using System.Data;
 using Dapper;
+using OfficeOpenXml;
+using System.IO;
+using System.Globalization;
+using System.Text;
 
 namespace MedicalLabAnalyzer.Services
 {
@@ -336,15 +340,268 @@ namespace MedicalLabAnalyzer.Services
             _db.Execute(sql, result);
         }
 
+        /// <summary>
+        /// قراءة وتحليل ملفات Excel/CSV لاستخراج نتائج البراز
+        /// </summary>
         private async Task<Dictionary<string, object>> ParseStoolFileAsync(string filePath)
         {
-            // هذا مثال مبسط - في التطبيق الحقيقي ستحتاج لاستخدام مكتبة لقراءة Excel/CSV
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException($"ملف البيانات غير موجود: {filePath}");
+
+            var extension = Path.GetExtension(filePath).ToLower();
+            
+            try
+            {
+                return extension switch
+                {
+                    ".xlsx" or ".xls" => await ParseExcelFileAsync(filePath),
+                    ".csv" => await ParseCsvFileAsync(filePath),
+                    _ => throw new NotSupportedException($"نوع الملف غير مدعوم: {extension}. الأنواع المدعومة: .xlsx, .xls, .csv")
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "خطأ في قراءة الملف: {FilePath}", filePath);
+                throw new InvalidOperationException($"فشل في قراءة الملف: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// قراءة ملف Excel لاستخراج نتائج البراز
+        /// </summary>
+        private async Task<Dictionary<string, object>> ParseExcelFileAsync(string filePath)
+        {
             var values = new Dictionary<string, object>();
             
-            // قراءة الملف واستخراج القيم
-            // يمكن استخدام EPPlus لقراءة Excel أو CsvHelper لقراءة CSV
+            await Task.Run(() =>
+            {
+                ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+                
+                using var package = new ExcelPackage(new FileInfo(filePath));
+                var worksheet = package.Workbook.Worksheets[0]; // أول ورقة عمل
+                
+                if (worksheet == null)
+                    throw new InvalidOperationException("لا توجد أوراق عمل في الملف");
+                
+                // قراءة البيانات من العمودين A (المعامل) و B (القيمة)
+                // أو من صف واحد إذا كانت البيانات مرتبة أفقياً
+                var rows = worksheet.Dimension?.Rows ?? 0;
+                var cols = worksheet.Dimension?.Columns ?? 0;
+                
+                if (rows == 0 || cols == 0)
+                    throw new InvalidOperationException("الملف فارغ أو لا يحتوي على بيانات صالحة");
+                
+                // محاولة قراءة البيانات كعمودين (معامل - قيمة)
+                if (cols >= 2)
+                {
+                    for (int row = 1; row <= rows; row++)
+                    {
+                        var parameter = worksheet.Cells[row, 1].Value?.ToString()?.Trim();
+                        var value = worksheet.Cells[row, 2].Value;
+                        
+                        if (!string.IsNullOrEmpty(parameter) && value != null)
+                        {
+                            values[parameter] = ParseValue(value.ToString());
+                        }
+                    }
+                }
+                // أو قراءة البيانات كصف واحد مع عناوين
+                else if (rows >= 2)
+                {
+                    for (int col = 1; col <= cols; col++)
+                    {
+                        var parameter = worksheet.Cells[1, col].Value?.ToString()?.Trim();
+                        var value = worksheet.Cells[2, col].Value;
+                        
+                        if (!string.IsNullOrEmpty(parameter) && value != null)
+                        {
+                            values[parameter] = ParseValue(value.ToString());
+                        }
+                    }
+                }
+                
+                // إضافة قيم افتراضية للحقول المطلوبة إذا لم تكن موجودة
+                AddDefaultValuesIfMissing(values);
+            });
             
+            _logger?.LogInformation("تم قراءة {Count} معامل من ملف Excel: {FilePath}", values.Count, filePath);
             return values;
+        }
+        
+        /// <summary>
+        /// قراءة ملف CSV لاستخراج نتائج البراز
+        /// </summary>
+        private async Task<Dictionary<string, object>> ParseCsvFileAsync(string filePath)
+        {
+            var values = new Dictionary<string, object>();
+            
+            var lines = await File.ReadAllLinesAsync(filePath, Encoding.UTF8);
+            
+            if (lines.Length == 0)
+                throw new InvalidOperationException("ملف CSV فارغ");
+            
+            // محاولة تحديد الفاصل المستخدم
+            var separator = DetectCsvSeparator(lines[0]);
+            
+            // قراءة البيانات كعمودين: معامل، قيمة
+            if (lines.Length >= 2)
+            {
+                var headers = lines[0].Split(separator, StringSplitOptions.RemoveEmptyEntries);
+                
+                // إذا كان هناك عمودين فقط (معامل - قيمة)
+                if (headers.Length == 2)
+                {
+                    for (int i = 1; i < lines.Length; i++)
+                    {
+                        var parts = lines[i].Split(separator, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length >= 2 && !string.IsNullOrEmpty(parts[0]))
+                        {
+                            values[parts[0].Trim().Trim('"')] = ParseValue(parts[1].Trim().Trim('"'));
+                        }
+                    }
+                }
+                // أو قراءة البيانات كصف واحد مع عناوين متعددة
+                else if (lines.Length >= 2)
+                {
+                    var dataRow = lines[1].Split(separator, StringSplitOptions.RemoveEmptyEntries);
+                    
+                    for (int i = 0; i < Math.Min(headers.Length, dataRow.Length); i++)
+                    {
+                        if (!string.IsNullOrEmpty(headers[i]) && !string.IsNullOrEmpty(dataRow[i]))
+                        {
+                            values[headers[i].Trim().Trim('"')] = ParseValue(dataRow[i].Trim().Trim('"'));
+                        }
+                    }
+                }
+            }
+            
+            // إضافة قيم افتراضية للحقول المطلوبة إذا لم تكن موجودة
+            AddDefaultValuesIfMissing(values);
+            
+            _logger?.LogInformation("تم قراءة {Count} معامل من ملف CSV: {FilePath}", values.Count, filePath);
+            return values;
+        }
+        
+        /// <summary>
+        /// تحديد نوع الفاصل المستخدم في ملف CSV
+        /// </summary>
+        private char DetectCsvSeparator(string firstLine)
+        {
+            var separators = new[] { ',', ';', '\t', '|' };
+            
+            return separators
+                .OrderByDescending(sep => firstLine.Count(c => c == sep))
+                .FirstOrDefault();
+        }
+        
+        /// <summary>
+        /// تحويل النص إلى القيمة المناسبة (رقم، منطق، أو نص)
+        /// </summary>
+        private object ParseValue(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return value;
+            
+            value = value.Trim();
+            
+            // محاولة تحويل إلى رقم
+            if (double.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out double doubleValue))
+                return doubleValue;
+            
+            // محاولة تحويل إلى عدد صحيح
+            if (int.TryParse(value, out int intValue))
+                return intValue;
+            
+            // محاولة تحويل إلى قيمة منطقية
+            if (bool.TryParse(value, out bool boolValue))
+                return boolValue;
+            
+            // التحقق من القيم المنطقية بالعربية أو الإنجليزية
+            switch (value.ToLower())
+            {
+                case "true" or "yes" or "نعم" or "موجب" or "إيجابي":
+                    return "Positive";
+                case "false" or "no" or "لا" or "سالب" or "سلبي":
+                    return "Negative";
+                case "present" or "موجود":
+                    return "Present";
+                case "absent" or "none" or "غير موجود" or "لا يوجد":
+                    return "None";
+                case "normal" or "طبيعي":
+                    return "Normal";
+                case "abnormal" or "غير طبيعي":
+                    return "Abnormal";
+                default:
+                    return value;
+            }
+        }
+        
+        /// <summary>
+        /// إضافة قيم افتراضية للحقول المطلوبة إذا لم تكن موجودة في الملف
+        /// </summary>
+        private void AddDefaultValuesIfMissing(Dictionary<string, object> values)
+        {
+            var defaults = new Dictionary<string, object>
+            {
+                { "Color", "Brown" },
+                { "Consistency", "Formed" },
+                { "Shape", "Normal" },
+                { "Weight", 100.0 },
+                { "Quantity", 100.0 },
+                { "Odor", "Normal" },
+                { "OccultBlood", "Negative" },
+                { "pH", "7.0" },
+                { "pHValue", 7.0 },
+                { "ReducingSubstances", "Negative" },
+                { "FatContent", "Normal" },
+                { "Fat", "Negative" },
+                { "Protein", "Negative" },
+                { "Mucus", "None" },
+                { "Pus", "None" },
+                { "Blood", "None" },
+                { "UndigestedFood", "None" },
+                { "FoodType", "" },
+                { "MuscleFibers", "None" },
+                { "Starch", "None" },
+                { "StarchGranules", "None" },
+                { "FatGlobules", "None" },
+                { "Parasites", "None" },
+                { "ParasiteType", "" },
+                { "ParasiteCount", 0 },
+                { "ParasiteStage", "" },
+                { "Ova", "None" },
+                { "OvaType", "" },
+                { "OvaCount", 0 },
+                { "Bacteria", "Normal" },
+                { "BacterialType", "" },
+                { "BacterialCount", 0 },
+                { "Yeast", "None" },
+                { "YeastType", "" },
+                { "YeastCount", 0 },
+                { "Calprotectin", "Normal" },
+                { "CalprotectinValue", 50.0 },
+                { "Lactoferrin", "Negative" },
+                { "LactoferrinValue", 0.0 },
+                { "Alpha1Antitrypsin", "Normal" },
+                { "CollectionMethod", "Spontaneous" },
+                { "PatientPreparation", "Normal diet" },
+                { "CultureResult", "No Growth" },
+                { "PathogenicOrganism", "" },
+                { "Sensitivity", "" },
+                { "RBC", 0 },
+                { "WBC", 0 },
+                { "EpithelialCells", 0 },
+                { "Macrophages", 0 },
+                { "Eosinophils", 0 }
+            };
+            
+            foreach (var defaultValue in defaults)
+            {
+                if (!values.ContainsKey(defaultValue.Key))
+                {
+                    values[defaultValue.Key] = defaultValue.Value;
+                }
+            }
         }
 
         private string DetermineBleedingType(StoolTestResult result)

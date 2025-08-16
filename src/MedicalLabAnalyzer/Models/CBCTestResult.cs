@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Linq;
 
 namespace MedicalLabAnalyzer.Models
 {
@@ -18,74 +19,74 @@ namespace MedicalLabAnalyzer.Models
         public decimal? RBC { get; set; } // 10^12/L
         public string? RBCStatus { get; set; } // Normal, Low, High
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? RBCMin { get; set; } = 4.5m; // Male: 4.5-5.5, Female: 4.0-5.0
+        public decimal? RBCMin { get; set; } // Age and gender specific, set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? RBCMax { get; set; } = 5.5m;
+        public decimal? RBCMax { get; set; }
 
         [Column(TypeName = "decimal(8,2)")]
         public decimal? Hemoglobin { get; set; } // g/dL
         public string? HemoglobinStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? HemoglobinMin { get; set; } = 13.5m; // Male: 13.5-17.5, Female: 12.0-15.5
+        public decimal? HemoglobinMin { get; set; } // Age and gender specific, set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? HemoglobinMax { get; set; } = 17.5m;
+        public decimal? HemoglobinMax { get; set; }
 
         [Column(TypeName = "decimal(8,2)")]
         public decimal? Hematocrit { get; set; } // %
         public string? HematocritStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? HematocritMin { get; set; } = 41.0m; // Male: 41-50, Female: 36-46
+        public decimal? HematocritMin { get; set; } // Age and gender specific, set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? HematocritMax { get; set; } = 50.0m;
+        public decimal? HematocritMax { get; set; }
 
         [Column(TypeName = "decimal(8,2)")]
         public decimal? MCV { get; set; } // fL
         public string? MCVStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? MCVMin { get; set; } = 80.0m; // 80-100
+        public decimal? MCVMin { get; set; } // Age specific, set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? MCVMax { get; set; } = 100.0m;
+        public decimal? MCVMax { get; set; }
 
         [Column(TypeName = "decimal(8,2)")]
         public decimal? MCH { get; set; } // pg
         public string? MCHStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? MCHMin { get; set; } = 27.0m; // 27-32
+        public decimal? MCHMin { get; set; } // Age specific, set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? MCHMax { get; set; } = 32.0m;
+        public decimal? MCHMax { get; set; }
 
         [Column(TypeName = "decimal(8,2)")]
         public decimal? MCHC { get; set; } // g/dL
         public string? MCHCStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? MCHCMin { get; set; } = 32.0m; // 32-36
+        public decimal? MCHCMin { get; set; } // Set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? MCHCMax { get; set; } = 36.0m;
+        public decimal? MCHCMax { get; set; }
 
         [Column(TypeName = "decimal(8,2)")]
         public decimal? RDW { get; set; } // %
         public string? RDWStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? RDWMin { get; set; } = 11.5m; // 11.5-14.5
+        public decimal? RDWMin { get; set; } // Set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? RDWMax { get; set; } = 14.5m;
+        public decimal? RDWMax { get; set; }
 
         // White Blood Cells (WBC)
         [Column(TypeName = "decimal(8,2)")]
         public decimal? WBC { get; set; } // 10^9/L
         public string? WBCStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? WBCMin { get; set; } = 4.0m; // 4.0-11.0
+        public decimal? WBCMin { get; set; } // Age specific, set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? WBCMax { get; set; } = 11.0m;
+        public decimal? WBCMax { get; set; }
 
         [Column(TypeName = "decimal(8,2)")]
         public decimal? Neutrophils { get; set; } // %
         public string? NeutrophilsStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? NeutrophilsMin { get; set; } = 40.0m; // 40-70
+        public decimal? NeutrophilsMin { get; set; } // Age specific, set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? NeutrophilsMax { get; set; } = 70.0m;
+        public decimal? NeutrophilsMax { get; set; }
         [Column(TypeName = "decimal(8,2)")]
         public decimal? NeutrophilsAbsolute { get; set; } // 10^9/L
 
@@ -93,9 +94,9 @@ namespace MedicalLabAnalyzer.Models
         public decimal? Lymphocytes { get; set; } // %
         public string? LymphocytesStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? LymphocytesMin { get; set; } = 20.0m; // 20-40
+        public decimal? LymphocytesMin { get; set; } // Age specific, set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? LymphocytesMax { get; set; } = 40.0m;
+        public decimal? LymphocytesMax { get; set; }
         [Column(TypeName = "decimal(8,2)")]
         public decimal? LymphocytesAbsolute { get; set; } // 10^9/L
 
@@ -103,9 +104,9 @@ namespace MedicalLabAnalyzer.Models
         public decimal? Monocytes { get; set; } // %
         public string? MonocytesStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? MonocytesMin { get; set; } = 2.0m; // 2-8
+        public decimal? MonocytesMin { get; set; } // Set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? MonocytesMax { get; set; } = 8.0m;
+        public decimal? MonocytesMax { get; set; }
         [Column(TypeName = "decimal(8,2)")]
         public decimal? MonocytesAbsolute { get; set; } // 10^9/L
 
@@ -113,9 +114,9 @@ namespace MedicalLabAnalyzer.Models
         public decimal? Eosinophils { get; set; } // %
         public string? EosinophilsStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? EosinophilsMin { get; set; } = 1.0m; // 1-4
+        public decimal? EosinophilsMin { get; set; } // Set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? EosinophilsMax { get; set; } = 4.0m;
+        public decimal? EosinophilsMax { get; set; }
         [Column(TypeName = "decimal(8,2)")]
         public decimal? EosinophilsAbsolute { get; set; } // 10^9/L
 
@@ -123,9 +124,9 @@ namespace MedicalLabAnalyzer.Models
         public decimal? Basophils { get; set; } // %
         public string? BasophilsStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? BasophilsMin { get; set; } = 0.5m; // 0.5-1
+        public decimal? BasophilsMin { get; set; } // Set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? BasophilsMax { get; set; } = 1.0m;
+        public decimal? BasophilsMax { get; set; }
         [Column(TypeName = "decimal(8,2)")]
         public decimal? BasophilsAbsolute { get; set; } // 10^9/L
 
@@ -134,58 +135,58 @@ namespace MedicalLabAnalyzer.Models
         public decimal? Platelets { get; set; } // 10^9/L
         public string? PlateletsStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? PlateletsMin { get; set; } = 150.0m; // 150-450
+        public decimal? PlateletsMin { get; set; } // Age specific, set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? PlateletsMax { get; set; } = 450.0m;
+        public decimal? PlateletsMax { get; set; }
 
         [Column(TypeName = "decimal(8,2)")]
         public decimal? MPV { get; set; } // fL
         public string? MPVStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? MPVMin { get; set; } = 7.5m; // 7.5-11.5
+        public decimal? MPVMin { get; set; } // Set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? MPVMax { get; set; } = 11.5m;
+        public decimal? MPVMax { get; set; }
 
         [Column(TypeName = "decimal(8,2)")]
         public decimal? PDW { get; set; } // %
         public string? PDWStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? PDWMin { get; set; } = 10.0m; // 10-17
+        public decimal? PDWMin { get; set; } // Set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? PDWMax { get; set; } = 17.0m;
+        public decimal? PDWMax { get; set; }
 
         [Column(TypeName = "decimal(8,2)")]
         public decimal? PCT { get; set; } // %
         public string? PCTStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? PCTMin { get; set; } = 0.1m; // 0.1-0.3
+        public decimal? PCTMin { get; set; } // Set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? PCTMax { get; set; } = 0.3m;
+        public decimal? PCTMax { get; set; }
 
         // Additional Parameters
         [Column(TypeName = "decimal(8,2)")]
         public decimal? Reticulocytes { get; set; } // %
         public string? ReticulocytesStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? ReticulocytesMin { get; set; } = 0.5m; // 0.5-2.5
+        public decimal? ReticulocytesMin { get; set; } // Age specific, set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? ReticulocytesMax { get; set; } = 2.5m;
+        public decimal? ReticulocytesMax { get; set; }
 
         [Column(TypeName = "decimal(8,2)")]
         public decimal? ESR { get; set; } // mm/hr
         public string? ESRStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? ESRMin { get; set; } = 0.0m; // Male: 0-15, Female: 0-20
+        public decimal? ESRMin { get; set; } // Age and gender specific, set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? ESRMax { get; set; } = 20.0m;
+        public decimal? ESRMax { get; set; }
 
         [Column(TypeName = "decimal(8,2)")]
         public decimal? CRP { get; set; } // mg/L
         public string? CRPStatus { get; set; }
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? CRPMin { get; set; } = 0.0m; // 0-3
+        public decimal? CRPMin { get; set; } // Set by MedicalReferenceService
         [Column(TypeName = "decimal(8,2)")]
-        public decimal? CRPMax { get; set; } = 3.0m;
+        public decimal? CRPMax { get; set; }
 
         // Blood Film Morphology
         [StringLength(500)]
@@ -232,28 +233,127 @@ namespace MedicalLabAnalyzer.Models
         // Methods
         public void AnalyzeResults()
         {
+            // Only analyze if reference ranges are set (should be set by MedicalReferenceService)
+            if (!RBCMin.HasValue || !RBCMax.HasValue) return;
+
             // RBC Analysis
-            if (RBC.HasValue)
+            if (RBC.HasValue && RBCMin.HasValue && RBCMax.HasValue)
             {
-                RBCStatus = RBC.Value < RBCMin ? "Low" : RBC.Value > RBCMax ? "High" : "Normal";
+                RBCStatus = RBC.Value < RBCMin.Value ? "Low" : RBC.Value > RBCMax.Value ? "High" : "Normal";
             }
 
             // Hemoglobin Analysis
-            if (Hemoglobin.HasValue)
+            if (Hemoglobin.HasValue && HemoglobinMin.HasValue && HemoglobinMax.HasValue)
             {
-                HemoglobinStatus = Hemoglobin.Value < HemoglobinMin ? "Low" : Hemoglobin.Value > HemoglobinMax ? "High" : "Normal";
+                HemoglobinStatus = Hemoglobin.Value < HemoglobinMin.Value ? "Low" : Hemoglobin.Value > HemoglobinMax.Value ? "High" : "Normal";
+            }
+
+            // Hematocrit Analysis
+            if (Hematocrit.HasValue && HematocritMin.HasValue && HematocritMax.HasValue)
+            {
+                HematocritStatus = Hematocrit.Value < HematocritMin.Value ? "Low" : Hematocrit.Value > HematocritMax.Value ? "High" : "Normal";
+            }
+
+            // MCV Analysis
+            if (MCV.HasValue && MCVMin.HasValue && MCVMax.HasValue)
+            {
+                MCVStatus = MCV.Value < MCVMin.Value ? "Low" : MCV.Value > MCVMax.Value ? "High" : "Normal";
+            }
+
+            // MCH Analysis
+            if (MCH.HasValue && MCHMin.HasValue && MCHMax.HasValue)
+            {
+                MCHStatus = MCH.Value < MCHMin.Value ? "Low" : MCH.Value > MCHMax.Value ? "High" : "Normal";
+            }
+
+            // MCHC Analysis
+            if (MCHC.HasValue && MCHCMin.HasValue && MCHCMax.HasValue)
+            {
+                MCHCStatus = MCHC.Value < MCHCMin.Value ? "Low" : MCHC.Value > MCHCMax.Value ? "High" : "Normal";
+            }
+
+            // RDW Analysis
+            if (RDW.HasValue && RDWMin.HasValue && RDWMax.HasValue)
+            {
+                RDWStatus = RDW.Value < RDWMin.Value ? "Low" : RDW.Value > RDWMax.Value ? "High" : "Normal";
             }
 
             // WBC Analysis
-            if (WBC.HasValue)
+            if (WBC.HasValue && WBCMin.HasValue && WBCMax.HasValue)
             {
-                WBCStatus = WBC.Value < WBCMin ? "Low" : WBC.Value > WBCMax ? "High" : "Normal";
+                WBCStatus = WBC.Value < WBCMin.Value ? "Low" : WBC.Value > WBCMax.Value ? "High" : "Normal";
+            }
+
+            // Neutrophils Analysis
+            if (Neutrophils.HasValue && NeutrophilsMin.HasValue && NeutrophilsMax.HasValue)
+            {
+                NeutrophilsStatus = Neutrophils.Value < NeutrophilsMin.Value ? "Low" : Neutrophils.Value > NeutrophilsMax.Value ? "High" : "Normal";
+            }
+
+            // Lymphocytes Analysis
+            if (Lymphocytes.HasValue && LymphocytesMin.HasValue && LymphocytesMax.HasValue)
+            {
+                LymphocytesStatus = Lymphocytes.Value < LymphocytesMin.Value ? "Low" : Lymphocytes.Value > LymphocytesMax.Value ? "High" : "Normal";
+            }
+
+            // Monocytes Analysis
+            if (Monocytes.HasValue && MonocytesMin.HasValue && MonocytesMax.HasValue)
+            {
+                MonocytesStatus = Monocytes.Value < MonocytesMin.Value ? "Low" : Monocytes.Value > MonocytesMax.Value ? "High" : "Normal";
+            }
+
+            // Eosinophils Analysis
+            if (Eosinophils.HasValue && EosinophilsMin.HasValue && EosinophilsMax.HasValue)
+            {
+                EosinophilsStatus = Eosinophils.Value < EosinophilsMin.Value ? "Low" : Eosinophils.Value > EosinophilsMax.Value ? "High" : "Normal";
+            }
+
+            // Basophils Analysis
+            if (Basophils.HasValue && BasophilsMin.HasValue && BasophilsMax.HasValue)
+            {
+                BasophilsStatus = Basophils.Value < BasophilsMin.Value ? "Low" : Basophils.Value > BasophilsMax.Value ? "High" : "Normal";
             }
 
             // Platelets Analysis
-            if (Platelets.HasValue)
+            if (Platelets.HasValue && PlateletsMin.HasValue && PlateletsMax.HasValue)
             {
-                PlateletsStatus = Platelets.Value < PlateletsMin ? "Low" : Platelets.Value > PlateletsMax ? "High" : "Normal";
+                PlateletsStatus = Platelets.Value < PlateletsMin.Value ? "Low" : Platelets.Value > PlateletsMax.Value ? "High" : "Normal";
+            }
+
+            // MPV Analysis
+            if (MPV.HasValue && MPVMin.HasValue && MPVMax.HasValue)
+            {
+                MPVStatus = MPV.Value < MPVMin.Value ? "Low" : MPV.Value > MPVMax.Value ? "High" : "Normal";
+            }
+
+            // PDW Analysis
+            if (PDW.HasValue && PDWMin.HasValue && PDWMax.HasValue)
+            {
+                PDWStatus = PDW.Value < PDWMin.Value ? "Low" : PDW.Value > PDWMax.Value ? "High" : "Normal";
+            }
+
+            // PCT Analysis
+            if (PCT.HasValue && PCTMin.HasValue && PCTMax.HasValue)
+            {
+                PCTStatus = PCT.Value < PCTMin.Value ? "Low" : PCT.Value > PCTMax.Value ? "High" : "Normal";
+            }
+
+            // Reticulocytes Analysis
+            if (Reticulocytes.HasValue && ReticulocytesMin.HasValue && ReticulocytesMax.HasValue)
+            {
+                ReticulocytesStatus = Reticulocytes.Value < ReticulocytesMin.Value ? "Low" : Reticulocytes.Value > ReticulocytesMax.Value ? "High" : "Normal";
+            }
+
+            // ESR Analysis
+            if (ESR.HasValue && ESRMin.HasValue && ESRMax.HasValue)
+            {
+                ESRStatus = ESR.Value < ESRMin.Value ? "Low" : ESR.Value > ESRMax.Value ? "High" : "Normal";
+            }
+
+            // CRP Analysis
+            if (CRP.HasValue && CRPMin.HasValue && CRPMax.HasValue)
+            {
+                CRPStatus = CRP.Value < CRPMin.Value ? "Low" : CRP.Value > CRPMax.Value ? "High" : "Normal";
             }
 
             // Calculate absolute counts
@@ -272,16 +372,35 @@ namespace MedicalLabAnalyzer.Models
             if (WBC.HasValue && Basophils.HasValue)
                 BasophilsAbsolute = WBC.Value * Basophils.Value / 100;
 
-            // Determine overall status
-            var abnormalCount = new[] { RBCStatus, HemoglobinStatus, WBCStatus, PlateletsStatus }
-                .Count(s => s == "Low" || s == "High");
+            // Determine overall status based on critical parameters
+            var statusList = new[] { RBCStatus, HemoglobinStatus, HematocritStatus, WBCStatus, PlateletsStatus };
+            var abnormalCount = statusList.Count(s => s == "Low" || s == "High");
+            var criticalCount = statusList.Count(s => s == "High" && IsCriticalHigh()) + 
+                               statusList.Count(s => s == "Low" && IsCriticalLow());
 
-            OverallStatus = abnormalCount switch
+            OverallStatus = criticalCount > 0 ? "Critical" : abnormalCount switch
             {
                 0 => "Normal",
-                1 => "Abnormal",
+                >= 1 and <= 2 => "Abnormal",
                 _ => "Critical"
             };
+        }
+
+        private bool IsCriticalHigh()
+        {
+            // Define critical high values that require immediate attention
+            return (WBC.HasValue && WBC.Value > 30) || // Severe leukocytosis
+                   (Platelets.HasValue && Platelets.Value > 1000) || // Severe thrombocytosis
+                   (ESR.HasValue && ESR.Value > 100) || // Very high ESR
+                   (CRP.HasValue && CRP.Value > 50); // Very high CRP
+        }
+
+        private bool IsCriticalLow()
+        {
+            // Define critical low values that require immediate attention
+            return (Hemoglobin.HasValue && Hemoglobin.Value < 8) || // Severe anemia
+                   (WBC.HasValue && WBC.Value < 2) || // Severe leukopenia
+                   (Platelets.HasValue && Platelets.Value < 50); // Severe thrombocytopenia
         }
 
         public override string ToString()
