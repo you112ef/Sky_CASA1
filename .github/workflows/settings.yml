@@ -1,0 +1,284 @@
+# GitHub Actions Settings
+# إعدادات GitHub Actions للنشر التلقائي
+
+# إعدادات البيئات
+environments:
+  staging:
+    name: Staging Environment
+    url: https://staging.medicallabsolutions.com
+    protection_rules:
+      - required_reviewers:
+          users: [admin, lab-manager]
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: true
+        required_approving_review_count: 1
+    
+  production:
+    name: Production Environment
+    url: https://medicallabsolutions.com
+    protection_rules:
+      - required_reviewers:
+          users: [admin, production-manager]
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: true
+        required_approving_review_count: 2
+        deployment_branch_policy:
+          protected_branches: true
+          custom_branch_policies: false
+
+# إعدادات Workflows
+workflows:
+  build-and-deploy:
+    name: Build and Deploy
+    description: بناء ونشر التطبيق تلقائياً
+    triggers:
+      - push:
+          branches: [main, develop]
+          tags: ['v*']
+      - pull_request:
+          branches: [main]
+      - workflow_dispatch:
+          inputs:
+            build_type:
+              description: 'نوع البناء'
+              required: true
+              default: 'release'
+              type: choice
+              options:
+                - debug
+                - release
+            create_zip:
+              description: 'إنشاء ZIP'
+              required: false
+              default: true
+              type: boolean
+            run_tests:
+              description: 'تشغيل الاختبارات'
+              required: false
+              default: true
+              type: boolean
+
+  continuous-testing:
+    name: Continuous Testing
+    description: اختبارات مستمرة للكود
+    triggers:
+      - push:
+          branches: [main, develop, feature/*]
+      - pull_request:
+          branches: [main, develop]
+      - schedule:
+          cron: '0 2 * * *'  # يومياً في الساعة 2 صباحاً
+
+  auto-deploy:
+    name: Auto Deploy
+    description: نشر تلقائي إلى البيئات
+    triggers:
+      - push:
+          branches: [main]
+          tags: ['v*']
+      - workflow_dispatch:
+          inputs:
+            environment:
+              description: 'بيئة النشر'
+              required: true
+              default: 'staging'
+              type: choice
+              options:
+                - staging
+                - production
+            force_deploy:
+              description: 'إجبار النشر'
+              required: false
+              default: false
+              type: boolean
+
+# إعدادات المتغيرات البيئية
+env:
+  DOTNET_VERSION: '8.0.x'
+  SOLUTION_FILE: 'MedicalLabAnalyzer.sln'
+  PROJECT_FILE: 'MedicalLabAnalyzer.csproj'
+  APP_NAME: 'MedicalLabAnalyzer'
+  COMPANY_NAME: 'Medical Lab Solutions'
+  SUPPORT_EMAIL: 'support@medicallabsolutions.com'
+
+# إعدادات الأمان
+security:
+  # فحص الثغرات الأمنية
+  vulnerability_scan: true
+  # فحص التبعيات
+  dependency_scan: true
+  # فحص الكود
+  code_scan: true
+  # فحص التكوين
+  config_scan: true
+
+# إعدادات الإشعارات
+notifications:
+  # إشعارات البريد الإلكتروني
+  email:
+    enabled: true
+    recipients:
+      - admin@medicallabsolutions.com
+      - dev-team@medicallabsolutions.com
+    events:
+      - workflow_failure
+      - deployment_success
+      - deployment_failure
+  
+  # إشعارات Slack
+  slack:
+    enabled: false
+    webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+    channel: '#deployments'
+    events:
+      - workflow_failure
+      - deployment_success
+      - deployment_failure
+
+# إعدادات النسخ الاحتياطية
+backup:
+  # نسخ احتياطي لقاعدة البيانات
+  database:
+    enabled: true
+    frequency: 'daily'
+    retention_days: 30
+    storage: 'azure-blob'
+  
+  # نسخ احتياطي للملفات
+  files:
+    enabled: true
+    frequency: 'weekly'
+    retention_days: 90
+    storage: 'azure-blob'
+
+# إعدادات المراقبة
+monitoring:
+  # مراقبة الأداء
+  performance:
+    enabled: true
+    metrics:
+      - cpu_usage
+      - memory_usage
+      - disk_usage
+      - response_time
+  
+  # مراقبة الأخطاء
+  error_tracking:
+    enabled: true
+    service: 'sentry'
+    project_id: ${{ secrets.SENTRY_PROJECT_ID }}
+  
+  # مراقبة السجلات
+  log_monitoring:
+    enabled: true
+    service: 'log-analytics'
+    workspace_id: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
+
+# إعدادات التوزيع
+distribution:
+  # توزيع عبر GitHub Releases
+  github_releases:
+    enabled: true
+    auto_create: true
+    include_artifacts: true
+  
+  # توزيع عبر Chocolatey
+  chocolatey:
+    enabled: false
+    api_key: ${{ secrets.CHOCOLATEY_API_KEY }}
+  
+  # توزيع عبر Microsoft Store
+  microsoft_store:
+    enabled: false
+    app_id: ${{ secrets.MICROSOFT_STORE_APP_ID }}
+    client_id: ${{ secrets.MICROSOFT_STORE_CLIENT_ID }}
+    client_secret: ${{ secrets.MICROSOFT_STORE_CLIENT_SECRET }}
+
+# إعدادات التوثيق
+documentation:
+  # تحديث التوثيق تلقائياً
+  auto_update: true
+  # إنشاء API documentation
+  api_docs: true
+  # إنشاء user manual
+  user_manual: true
+  # إنشاء developer guide
+  developer_guide: true
+
+# إعدادات الجودة
+quality:
+  # فحص جودة الكود
+  code_quality:
+    enabled: true
+    tools:
+      - sonarqube
+      - codecov
+      - codacy
+  
+  # فحص الأداء
+  performance:
+    enabled: true
+    tools:
+      - benchmarkdotnet
+      - dotnet-trace
+  
+  # فحص الأمان
+  security:
+    enabled: true
+    tools:
+      - snyk
+      - owasp-dependency-check
+      - bandit
+
+# إعدادات التطوير
+development:
+  # إعدادات Git
+  git:
+    branch_protection: true
+    required_reviews: 2
+    dismiss_stale_reviews: true
+    require_code_owner_reviews: true
+  
+  # إعدادات Pull Requests
+  pull_requests:
+    auto_merge: false
+    delete_branch_after_merge: true
+    squash_merge: true
+  
+  # إعدادات Issues
+  issues:
+    auto_label: true
+    auto_assign: true
+    templates: true
+
+# إعدادات الترخيص
+license:
+  # نوع الترخيص
+  type: 'MIT'
+  # سنة الترخيص
+  year: '2024'
+  # اسم المالك
+  owner: 'Medical Lab Solutions'
+
+# إعدادات الدعم
+support:
+  # معلومات الاتصال
+  contact:
+    email: 'support@medicallabsolutions.com'
+    phone: '+1-555-123-4567'
+    website: 'https://medicallabsolutions.com'
+  
+  # ساعات الدعم
+  hours:
+    monday: '9:00 AM - 6:00 PM'
+    tuesday: '9:00 AM - 6:00 PM'
+    wednesday: '9:00 AM - 6:00 PM'
+    thursday: '9:00 AM - 6:00 PM'
+    friday: '9:00 AM - 6:00 PM'
+    saturday: '10:00 AM - 4:00 PM'
+    sunday: 'Closed'
+  
+  # اللغات المدعومة
+  languages:
+    - Arabic
+    - English

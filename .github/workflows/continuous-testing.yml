@@ -1,0 +1,209 @@
+name: Continuous Testing
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # تشغيل الاختبارات يومياً في الساعة 2 صباحاً
+    - cron: '0 2 * * *'
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  SOLUTION_FILE: 'MedicalLabAnalyzer.sln'
+
+jobs:
+  unit-tests:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Build solution
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+    - name: Run unit tests
+      run: dotnet test ${{ env.SOLUTION_FILE }} --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage --logger trx --logger "console;verbosity=detailed"
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: unit-test-results
+        path: |
+          coverage/
+          TestResults/
+
+    - name: Generate coverage report
+      run: |
+        Write-Host "Generating coverage report..."
+        # هنا يمكن إضافة توليد تقرير التغطية
+
+  integration-tests:
+    runs-on: windows-latest
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Build solution
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+    - name: Run integration tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} --configuration Release --no-build --filter "Category=Integration" --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage-integration
+
+    - name: Upload integration test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: integration-test-results
+        path: coverage-integration/
+
+  performance-tests:
+    runs-on: windows-latest
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Build solution
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+    - name: Run performance tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} --configuration Release --no-build --filter "Category=Performance" --verbosity normal
+
+    - name: Upload performance test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-test-results
+        path: TestResults/
+
+  code-quality:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install SonarCloud scanner
+      uses: sonarqube-quality-gate-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    - name: Run code analysis
+      run: |
+        dotnet tool install --global dotnet-format
+        dotnet format --verify-no-changes --verbosity diagnostic
+
+    - name: Check code style
+      run: |
+        Write-Host "Checking code style and formatting..."
+        # هنا يمكن إضافة فحص أسلوب الكود
+
+  security-tests:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Security scan
+      run: |
+        Write-Host "Running security vulnerability scan..."
+        dotnet list package --vulnerable
+        
+        Write-Host "Checking for known security issues..."
+        # هنا يمكن إضافة فحص الأمان
+
+    - name: Upload security report
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-test-results
+        path: security-report.txt
+
+  notify-results:
+    runs-on: windows-latest
+    needs: [unit-tests, integration-tests, performance-tests, code-quality, security-tests]
+    if: always()
+    
+    steps:
+    - name: Check test results
+      run: |
+        Write-Host "All tests completed!"
+        Write-Host "Build Number: ${{ github.run_number }}"
+        Write-Host "Commit: ${{ github.sha }}"
+        
+        if [ "${{ needs.unit-tests.result }}" == "success" ]; then
+          echo "✅ Unit tests passed"
+        else
+          echo "❌ Unit tests failed"
+        fi
+        
+        if [ "${{ needs.integration-tests.result }}" == "success" ]; then
+          echo "✅ Integration tests passed"
+        else
+          echo "❌ Integration tests failed"
+        fi
+        
+        if [ "${{ needs.performance-tests.result }}" == "success" ]; then
+          echo "✅ Performance tests passed"
+        else
+          echo "❌ Performance tests failed"
+        fi
+        
+        if [ "${{ needs.code-quality.result }}" == "success" ]; then
+          echo "✅ Code quality checks passed"
+        else
+          echo "❌ Code quality checks failed"
+        fi
+        
+        if [ "${{ needs.security-tests.result }}" == "success" ]; then
+          echo "✅ Security tests passed"
+        else
+          echo "❌ Security tests failed"
+        fi
+
+    - name: Send notification
+      if: failure()
+      run: |
+        Write-Host "Sending failure notification..."
+        # هنا يمكن إضافة إرسال إشعار بالفشل

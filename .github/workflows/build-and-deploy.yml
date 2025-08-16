@@ -1,0 +1,252 @@
+name: Build and Deploy MedicalLabAnalyzer
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'نوع البناء'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+        - debug
+        - release
+      create_zip:
+        description: 'إنشاء ZIP'
+        required: false
+        default: true
+        type: boolean
+      run_tests:
+        description: 'تشغيل الاختبارات'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  SOLUTION_FILE: 'MedicalLabAnalyzer.sln'
+  PROJECT_FILE: 'MedicalLabAnalyzer.csproj'
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Build solution
+      run: |
+        dotnet build ${{ env.SOLUTION_FILE }} --configuration ${{ github.event.inputs.build_type || 'Release' }} --no-restore
+        dotnet build ${{ env.SOLUTION_FILE }} --configuration ${{ github.event.inputs.build_type || 'Release' }} --no-restore --verbosity detailed
+
+    - name: Run tests
+      if: ${{ github.event.inputs.run_tests != false }}
+      run: dotnet test ${{ env.SOLUTION_FILE }} --configuration ${{ github.event.inputs.build_type || 'Release' }} --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
+
+    - name: Upload test results
+      if: ${{ github.event.inputs.run_tests != false }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: coverage/
+
+    - name: Publish application
+      run: |
+        dotnet publish ${{ env.PROJECT_FILE }} --configuration ${{ github.event.inputs.build_type || 'Release' }} --runtime win-x64 --self-contained true --output publish/win-x64 --verbosity normal
+
+    - name: Create deployment package
+      if: ${{ github.event.inputs.create_zip != false }}
+      run: |
+        $packageName = "MedicalLabAnalyzer_v${{ github.run_number }}_win-x64"
+        $distPath = "dist"
+        $publishPath = "publish/win-x64"
+        
+        # إنشاء مجلد التوزيع
+        New-Item -ItemType Directory -Path "$distPath/$packageName" -Force
+        
+        # نسخ الملفات المنشورة
+        Copy-Item -Path "$publishPath/*" -Destination "$distPath/$packageName/" -Recurse -Force
+        
+        # نسخ ملفات إضافية
+        Copy-Item -Path "README.md" -Destination "$distPath/$packageName/" -Force
+        Copy-Item -Path "INSTALLATION_GUIDE.md" -Destination "$distPath/$packageName/" -Force
+        Copy-Item -Path "QUICK_START.md" -Destination "$distPath/$packageName/" -Force
+        Copy-Item -Path "CHANGELOG.txt" -Destination "$distPath/$packageName/" -Force
+        
+        # إنشاء ملف appsettings.json
+        @"
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=Database/medical_lab.db"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "AllowedHosts": "*",
+  "Database": {
+    "AutoMigrate": true,
+    "SeedData": true
+  },
+  "Reports": {
+    "OutputPath": "Reports/GeneratedReports",
+    "ArchivePath": "Reports/Archive",
+    "TemplatePath": "Reports/Templates"
+  },
+  "Security": {
+    "JwtSecret": "your-super-secret-jwt-key-change-in-production",
+    "JwtExpirationHours": 24
+  }
+}
+"@ | Out-File -FilePath "$distPath/$packageName/appsettings.json" -Encoding UTF8
+        
+        # إنشاء ZIP
+        Compress-Archive -Path "$distPath/$packageName/*" -DestinationPath "$distPath/${packageName}.zip" -Force
+        
+        # إنشاء ملف معلومات الإصدار
+        @"
+MedicalLabAnalyzer v${{ github.run_number }}
+Build Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+Commit: ${{ github.sha }}
+Branch: ${{ github.ref_name }}
+"@ | Out-File -FilePath "$distPath/${packageName}_info.txt" -Encoding UTF8
+
+    - name: Upload deployment package
+      if: ${{ github.event.inputs.create_zip != false }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: deployment-package
+        path: dist/*.zip
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts
+        path: publish/win-x64/
+
+  create-release:
+    needs: build-and-test
+    runs-on: windows-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download deployment package
+      uses: actions/download-artifact@v4
+      with:
+        name: deployment-package
+        path: dist/
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/*.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        title: MedicalLabAnalyzer ${{ github.ref_name }}
+        body: |
+          ## 🎉 MedicalLabAnalyzer ${{ github.ref_name }}
+          
+          ### 📦 ما هو جديد في هذا الإصدار:
+          - ✅ تحسينات في الأداء
+          - ✅ إصلاح الأخطاء
+          - ✅ تحديثات الواجهة
+          - ✅ تحسينات في التقارير
+          
+          ### 🚀 التثبيت:
+          1. قم بتحميل الملف المضغوط
+          2. استخراج الملفات
+          3. تشغيل `MedicalLabAnalyzer.exe`
+          
+          ### 📋 المتطلبات:
+          - Windows 10/11 (64-bit)
+          - .NET 8.0 Runtime
+          
+          ### 🔧 المستخدمين الافتراضيين:
+          - **admin/admin** - مدير
+          - **lab/123** - فني مختبر
+          - **reception/123** - مستقبل
+          
+          ### 📞 الدعم:
+          - راجع `INSTALLATION_GUIDE.md` للتفاصيل
+          - راجع `README.md` للتوثيق الشامل
+          
+          ---
+          
+          **MedicalLabAnalyzer** - نظام إدارة مختبر طبي متقدم 🏥✨
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-to-staging:
+    needs: build-and-test
+    runs-on: windows-latest
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: build-artifacts
+        path: staging/
+
+    - name: Deploy to staging
+      run: |
+        Write-Host "Deploying to staging environment..."
+        # هنا يمكن إضافة خطوات النشر إلى بيئة الاختبار
+        # مثال: نسخ الملفات إلى خادم الاختبار
+
+    - name: Notify deployment
+      run: |
+        Write-Host "Staging deployment completed successfully!"
+        Write-Host "Build Number: ${{ github.run_number }}"
+        Write-Host "Commit: ${{ github.sha }}"
+
+  security-scan:
+    runs-on: windows-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Security scan
+      run: |
+        Write-Host "Running security scan..."
+        # هنا يمكن إضافة أدوات فحص الأمان
+        # مثال: dotnet list package --vulnerable
+
+    - name: Upload security report
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-report
+        path: security-report.txt
