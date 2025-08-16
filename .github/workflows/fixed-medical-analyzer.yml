@@ -1,0 +1,335 @@
+name: MedicalLabAnalyzer - Fixed CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Configuration'
+        required: true
+        default: 'Release'
+        type: choice
+        options:
+        - Debug
+        - Release
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  SOLUTION_FILE: 'MedicalLabAnalyzer.sln'
+  BUILD_CONFIGURATION: ${{ github.event.inputs.build_type || 'Release' }}
+
+jobs:
+  # Job 1: Build and Test (Fixed)
+  build-and-test:
+    name: Build and Test
+    runs-on: windows-latest
+    timeout-minutes: 25
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install Chocolatey
+      run: |
+        Write-Host "=== Installing Chocolatey ==="
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        Write-Host "✅ Chocolatey installed successfully"
+
+    - name: Install VC++ Redistributables
+      run: |
+        Write-Host "=== Installing VC++ Redistributables ==="
+        choco install vcredist2019 -y --no-progress
+        choco install vcredist2022 -y --no-progress
+        Write-Host "✅ VC++ Redistributables installed successfully"
+
+    - name: Clear NuGet cache
+      run: |
+        Write-Host "=== Clearing NuGet cache ==="
+        dotnet nuget locals all --clear
+        Write-Host "✅ NuGet cache cleared successfully"
+
+    - name: Verify solution file
+      run: |
+        Write-Host "=== Verifying solution file ==="
+        if (Test-Path "${{ env.SOLUTION_FILE }}") {
+          Write-Host "✅ Solution file found: ${{ env.SOLUTION_FILE }}"
+          Get-Content "${{ env.SOLUTION_FILE }}" | Select-Object -First 10
+        } else {
+          Write-Host "❌ Solution file not found: ${{ env.SOLUTION_FILE }}"
+          Write-Host "Available files:"
+          Get-ChildItem -Name "*.sln"
+          exit 1
+        }
+
+    - name: Restore NuGet packages
+      run: |
+        Write-Host "=== Restoring NuGet packages ==="
+        dotnet restore "${{ env.SOLUTION_FILE }}" --verbosity normal
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ NuGet packages restored successfully"
+        } else {
+          Write-Host "❌ NuGet restore failed"
+          exit 1
+        }
+
+    - name: Build solution
+      run: |
+        Write-Host "=== Building solution ==="
+        Write-Host "Configuration: ${{ env.BUILD_CONFIGURATION }}"
+        dotnet build "${{ env.SOLUTION_FILE }}" --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore --verbosity normal
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Solution built successfully"
+        } else {
+          Write-Host "❌ Build failed"
+          exit 1
+        }
+
+    - name: Create TestResults directory
+      run: |
+        Write-Host "=== Creating TestResults directory ==="
+        New-Item -ItemType Directory -Path "TestResults" -Force
+        Write-Host "✅ TestResults directory created"
+
+    - name: Run unit tests
+      run: |
+        Write-Host "=== Running unit tests ==="
+        dotnet test "${{ env.SOLUTION_FILE }}" --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity normal --logger "console;verbosity=normal" --results-directory ./TestResults
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Unit tests completed successfully"
+        } else {
+          Write-Host "❌ Unit tests failed"
+          exit 1
+        }
+
+    - name: Check test results
+      run: |
+        Write-Host "=== Checking test results ==="
+        $testResults = Get-ChildItem -Path "TestResults/*.trx" -ErrorAction SilentlyContinue
+        if ($testResults) {
+          Write-Host "✅ Test results found:"
+          $testResults | ForEach-Object { Write-Host "  - $($_.Name)" }
+        } else {
+          Write-Host "⚠️ No test result files found"
+        }
+
+    - name: Check build artifacts
+      run: |
+        Write-Host "=== Checking build artifacts ==="
+        $binPath = "bin/${{ env.BUILD_CONFIGURATION }}/net8.0-windows"
+        if (Test-Path $binPath) {
+          $files = Get-ChildItem $binPath -Recurse -File | Measure-Object -Property Length -Sum
+          Write-Host "✅ Build artifacts found: $($files.Count) files, $([math]::Round($files.Sum / 1MB, 2)) MB"
+        } else {
+          Write-Host "⚠️ No build artifacts found in $binPath"
+          # Check other possible paths
+          $possiblePaths = @("bin/${{ env.BUILD_CONFIGURATION }}", "bin", "obj/${{ env.BUILD_CONFIGURATION }}")
+          foreach ($path in $possiblePaths) {
+            if (Test-Path $path) {
+              Write-Host "Found files in: $path"
+              Get-ChildItem $path -Recurse -File | Select-Object -First 5 | ForEach-Object { Write-Host "  - $($_.Name)" }
+            }
+          }
+        }
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: TestResults-${{ github.run_number }}
+        path: TestResults/
+        retention-days: 30
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: BuildArtifacts-${{ github.run_number }}
+        path: |
+          bin/${{ env.BUILD_CONFIGURATION }}/net8.0-windows/
+          obj/${{ env.BUILD_CONFIGURATION }}/net8.0-windows/
+        retention-days: 30
+
+  # Job 2: Code Quality Analysis (Optional)
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: success() && github.event_name != 'pull_request'
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install SonarCloud scanner
+      run: |
+        echo "=== Installing SonarCloud scanner ==="
+        dotnet tool install --global dotnet-sonarscanner
+        echo "✅ SonarCloud scanner installed"
+
+    - name: Begin SonarCloud analysis
+      run: |
+        echo "=== Starting SonarCloud analysis ==="
+        dotnet sonarscanner begin \
+          /k:"my-org:medical-analyzer" \
+          /o:"my-org" \
+          /d:sonar.login="${{ secrets.SONAR_TOKEN }}" \
+          /d:sonar.host.url="https://sonarcloud.io" \
+          /d:sonar.cs.vstest.reportsPaths="**/*.trx" \
+          /d:sonar.cs.opencover.reportsPaths="**/coverage.cobertura.xml"
+        echo "✅ SonarCloud analysis started"
+
+    - name: Build for SonarCloud
+      run: |
+        echo "=== Building for SonarCloud ==="
+        dotnet build "${{ env.SOLUTION_FILE }}" --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+        echo "✅ Build for SonarCloud completed"
+
+    - name: Run tests for SonarCloud
+      run: |
+        echo "=== Running tests for SonarCloud ==="
+        dotnet test "${{ env.SOLUTION_FILE }}" --configuration ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity normal
+        echo "✅ Tests for SonarCloud completed"
+
+    - name: End SonarCloud analysis
+      run: |
+        echo "=== Finalizing SonarCloud analysis ==="
+        dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+        echo "✅ SonarCloud analysis completed"
+
+    - name: SonarCloud Quality Gate
+      uses: sonarsource/sonarqube-quality-gate-action@master
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      with:
+        scanMetadataReportFile: .scannerwork/report-task.txt
+
+  # Job 3: Package Creation (Optional)
+  package:
+    name: Create Package
+    runs-on: windows-latest
+    needs: build-and-test
+    if: success() && github.event_name != 'pull_request'
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        Write-Host "=== Installing dependencies ==="
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        choco install vcredist2019 vcredist2022 -y --no-progress
+        Write-Host "✅ Dependencies installed"
+
+    - name: Restore and build
+      run: |
+        Write-Host "=== Restoring and building ==="
+        dotnet restore "${{ env.SOLUTION_FILE }}"
+        dotnet build "${{ env.SOLUTION_FILE }}" --configuration ${{ env.BUILD_CONFIGURATION }} --no-restore
+        Write-Host "✅ Build completed"
+
+    - name: Create package
+      run: |
+        Write-Host "=== Creating package ==="
+        # Create distribution directory
+        $distPath = "Dist/MedicalLabAnalyzer-${{ github.run_number }}"
+        New-Item -ItemType Directory -Path $distPath -Force
+        
+        # Publish application
+        dotnet publish "${{ env.SOLUTION_FILE }}" --configuration ${{ env.BUILD_CONFIGURATION }} --runtime win-x64 --self-contained true --output "$distPath/App"
+        
+        # Copy additional files
+        Copy-Item -Path "README.md" -Destination "$distPath/" -Force -ErrorAction SilentlyContinue
+        Copy-Item -Path "CHANGELOG.txt" -Destination "$distPath/" -Force -ErrorAction SilentlyContinue
+        Copy-Item -Path "LICENSE" -Destination "$distPath/" -Force -ErrorAction SilentlyContinue
+        
+        # Create ZIP
+        $zipPath = "Dist/MedicalLabAnalyzer-${{ github.run_number }}.zip"
+        Compress-Archive -Path "$distPath/*" -DestinationPath $zipPath -Force
+        Write-Host "✅ Package created: $zipPath"
+
+    - name: Upload package
+      uses: actions/upload-artifact@v4
+      with:
+        name: MedicalLabAnalyzer-Package-${{ github.run_number }}
+        path: Dist/*.zip
+        retention-days: 90
+
+  # Job 4: Summary and Notifications
+  summary:
+    name: Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: [build-and-test, code-quality, package]
+    if: always()
+    timeout-minutes: 5
+    
+    steps:
+    - name: Generate summary
+      run: |
+        echo "## 🏥 MedicalLabAnalyzer CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Pipeline Status" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build & Test**: ${{ needs.build-and-test.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Code Quality**: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Package Creation**: ${{ needs.package.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+        echo "- **Workflow Run**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- Test Results: Available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- Build Artifacts: Available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- Package: Available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "*Generated by MedicalLabAnalyzer Fixed CI/CD Pipeline*" >> $GITHUB_STEP_SUMMARY
+
+    - name: Notify Slack (Optional)
+      if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+      uses: slackapi/slack-github-action@v1.25.0
+      with:
+        payload: |
+          {
+            "text": "🏥 MedicalLabAnalyzer CI/CD Pipeline Status",
+            "attachments": [
+              {
+                "color": "${{ needs.build-and-test.result == 'success' && 'good' || 'danger' }}",
+                "fields": [
+                  {"title": "Build & Test", "value": "${{ needs.build-and-test.result }}", "short": true},
+                  {"title": "Code Quality", "value": "${{ needs.code-quality.result }}", "short": true},
+                  {"title": "Package", "value": "${{ needs.package.result }}", "short": true},
+                  {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
+                  {"title": "Run Number", "value": "${{ github.run_number }}", "short": true}
+                ],
+                "footer": "MedicalLabAnalyzer Fixed CI/CD Pipeline"
+              }
+            ]
+          }

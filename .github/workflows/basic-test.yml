@@ -1,0 +1,65 @@
+name: Basic Test - MedicalLabAnalyzer
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  SOLUTION_FILE: 'MedicalLabAnalyzer.sln'
+
+jobs:
+  basic-test:
+    name: Basic Build and Test
+    runs-on: windows-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: List files
+      run: |
+        Write-Host "=== Repository contents ==="
+        Get-ChildItem -Name
+        Write-Host "=== Solution files ==="
+        Get-ChildItem -Name "*.sln"
+
+    - name: Clear NuGet cache
+      run: |
+        Write-Host "=== Clearing NuGet cache ==="
+        dotnet nuget locals all --clear
+        Write-Host "✅ NuGet cache cleared"
+
+    - name: Restore packages
+      run: |
+        Write-Host "=== Restoring packages ==="
+        dotnet restore "${{ env.SOLUTION_FILE }}" --verbosity normal
+        Write-Host "✅ Packages restored"
+
+    - name: Build solution
+      run: |
+        Write-Host "=== Building solution ==="
+        dotnet build "${{ env.SOLUTION_FILE }}" --configuration Release --no-restore --verbosity normal
+        Write-Host "✅ Solution built"
+
+    - name: Run tests
+      run: |
+        Write-Host "=== Running tests ==="
+        dotnet test "${{ env.SOLUTION_FILE }}" --configuration Release --no-build --verbosity normal
+        Write-Host "✅ Tests completed"
+
+    - name: Success message
+      run: |
+        Write-Host "✅ Basic test completed successfully!"
+        Write-Host "Build Number: ${{ github.run_number }}"
+        Write-Host "Commit: ${{ github.sha }}"
+        Write-Host "Branch: ${{ github.ref_name }}"
