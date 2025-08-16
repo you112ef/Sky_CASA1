@@ -9,20 +9,28 @@ A comprehensive medical laboratory management system with video analysis capabil
 ### Core Functionality - الوظائف الأساسية
 - **Patient Management** - إدارة المرضى
 - **Exam Management** - إدارة الفحوصات
+- **CASA Analysis** - تحليل الحيوانات المنوية الحاسوبي
 - **Video Analysis** - تحليل الفيديو باستخدام EmguCV
-- **Reporting System** - نظام التقارير (Crystal Reports + PDF fallback)
+- **Real-time Tracking** - تتبع الحيوانات المنوية في الوقت الفعلي
+- **Calibration System** - نظام معايرة الكاميرا/العدسة
+- **Reporting System** - نظام التقارير (PDF + Crystal Reports)
 - **User Authentication & Authorization** - نظام المصادقة والتفويض
+- **Audit Logging** - تسجيل جميع العمليات
 - **Backup & Restore** - النسخ الاحتياطي والاستعادة
 - **Multi-language Support** - دعم متعدد اللغات (English/Arabic)
 
 ### Technical Features - المميزات التقنية
 - **Modern WPF MVVM Architecture** - هيكل WPF MVVM حديث
-- **Entity Framework Core** - قاعدة بيانات SQLite
+- **SQLite Database** - قاعدة بيانات SQLite مع Dapper ORM
+- **EmguCV Integration** - معالجة الفيديو والصور المتقدمة
+- **Real-time Sperm Tracking** - تتبع الحيوانات المنوية في الوقت الفعلي
+- **CASA Metrics Calculation** - حساب مقاييس CASA (VCL, VSL, VAP, ALH, BCF)
 - **Material Design UI** - واجهة مستخدم Material Design
 - **Dependency Injection** - حقن التبعيات
-- **Comprehensive Logging** - تسجيل شامل
+- **Comprehensive Logging** - تسجيل شامل مع Audit Trail
 - **Async/Await Pattern** - نمط البرمجة غير المتزامن
 - **Error Handling** - معالجة الأخطاء
+- **Unit Testing** - اختبارات الوحدات الشاملة
 
 ## 🛠️ Prerequisites - المتطلبات الأساسية
 
