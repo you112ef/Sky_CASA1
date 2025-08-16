@@ -14,6 +14,7 @@ namespace MedicalLabAnalyzer.Views
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<MainWindow> _logger;
         private readonly AuthService _authService;
+        private readonly AuditLogger _auditLogger;
         private User? _currentUser;
 
         public MainWindow(IServiceProvider serviceProvider)
@@ -22,6 +23,19 @@ namespace MedicalLabAnalyzer.Views
             _serviceProvider = serviceProvider;
             _logger = serviceProvider.GetRequiredService<ILogger<MainWindow>>();
             _authService = serviceProvider.GetRequiredService<AuthService>();
+            _auditLogger = serviceProvider.GetRequiredService<AuditLogger>();
+
+            Loaded += MainWindow_Loaded;
+            InitializeNavigation();
+        }
+
+        // Constructor overload for direct user injection (used by LoginViewModel)
+        public MainWindow(User user)
+        {
+            InitializeComponent();
+            _currentUser = user;
+            _authService = new AuthService();
+            _auditLogger = new AuditLogger();
 
             Loaded += MainWindow_Loaded;
             InitializeNavigation();
@@ -98,6 +112,40 @@ namespace MedicalLabAnalyzer.Views
         private void UpdateButtonPermissions()
         {
             if (_currentUser == null) return;
+
+            // إخفاء جميع الأزرار أولاً
+            btnPatients.Visibility = Visibility.Collapsed;
+            btnExams.Visibility = Visibility.Collapsed;
+            btnVideoAnalysis.Visibility = Visibility.Collapsed;
+            btnReports.Visibility = Visibility.Collapsed;
+            btnSettings.Visibility = Visibility.Collapsed;
+            btnBackup.Visibility = Visibility.Collapsed;
+
+            // إظهار الأزرار حسب نوع المستخدم
+            switch (_currentUser.Role)
+            {
+                case UserRoleType.Admin:
+                    // المدير: جميع الصلاحيات
+                    btnPatients.Visibility = Visibility.Visible;
+                    btnExams.Visibility = Visibility.Visible;
+                    btnVideoAnalysis.Visibility = Visibility.Visible;
+                    btnReports.Visibility = Visibility.Visible;
+                    btnSettings.Visibility = Visibility.Visible;
+                    btnBackup.Visibility = Visibility.Visible;
+                    break;
+
+                case UserRoleType.LabTechnician:
+                    // فني المختبر: إدارة الفحوصات والتحليل والتقارير
+                    btnExams.Visibility = Visibility.Visible;
+                    btnVideoAnalysis.Visibility = Visibility.Visible;
+                    btnReports.Visibility = Visibility.Visible;
+                    break;
+
+                case UserRoleType.Receptionist:
+                    // المستقبل: إدارة المرضى فقط
+                    btnPatients.Visibility = Visibility.Visible;
+                    break;
+            }
 
             var role = _currentUser.RoleName?.ToLower();
             

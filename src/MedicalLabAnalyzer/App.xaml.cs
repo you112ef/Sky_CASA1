@@ -35,12 +35,19 @@ namespace MedicalLabAnalyzer
                             builder.AddSerilog();
                         });
 
-                        // Register services
-                        services.AddScoped<DatabaseService>();
-                        services.AddScoped<AuthService>();
-                        services.AddScoped<CalibrationService>();
-                        services.AddScoped<ImageAnalysisService>();
-                        services.AddScoped<ReportService>();
+                                        // Register services
+                services.AddScoped<DatabaseService>();
+                services.AddScoped<AuthService>();
+                services.AddScoped<UserService>();
+                services.AddScoped<PatientService>();
+                services.AddScoped<CalibrationService>();
+                services.AddScoped<ImageAnalysisService>();
+                services.AddScoped<VideoAnalysisService>();
+                services.AddScoped<ReportService>();
+                services.AddScoped<CBCAnalyzer>();
+                services.AddScoped<UrineAnalyzer>();
+                services.AddScoped<StoolAnalyzer>();
+                services.AddScoped<AuditLogger>();
 
                         // Register Views
                         services.AddTransient<MainWindow>();
@@ -62,9 +69,9 @@ namespace MedicalLabAnalyzer
                 _logger = _host.Services.GetRequiredService<ILogger<App>>();
                 _logger.LogInformation("Application started successfully");
 
-                // Show main window
-                var mainWindow = _host.Services.GetRequiredService<MainWindow>();
-                mainWindow.Show();
+                // Show login window first
+                var loginWindow = new Views.LoginView();
+                loginWindow.Show();
 
                 base.OnStartup(e);
             }

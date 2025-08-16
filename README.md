@@ -1,273 +1,329 @@
-# Medical Lab Analyzer - Advanced CASA System
+# MedicalLabAnalyzer - Advanced Medical Laboratory Management System
 
-## 🏥 Professional Computer-Aided Sperm Analysis (CASA) System
+## 🏥 نظرة عامة
 
-A comprehensive, professional-grade medical laboratory management system with advanced video analysis capabilities for sperm motility assessment using state-of-the-art computer vision algorithms.
+**MedicalLabAnalyzer** هو نظام إدارة مختبر طبي متقدم ومتكامل يعمل بدون إنترنت، مصمم خصيصاً للمختبرات الطبية والمستشفيات. النظام يدعم اللغة العربية بالكامل مع واجهة RTL، ويوفر تحليلات طبية متقدمة مع نظام صلاحيات متدرج.
 
-## ✨ Key Features
+## ✨ المميزات الرئيسية
 
-### 🔬 Advanced CASA Analysis
-- **Kalman Filter Tracking**: Robust multi-object tracking using Kalman filters for accurate sperm movement analysis
-- **Hungarian Algorithm**: Optimal data association for handling multiple sperm in crowded samples
-- **Real-time Processing**: Efficient video analysis with progress tracking
-- **Comprehensive Metrics**: VCL, VSL, VAP, ALH, BCF, LIN, STR, WOB calculations
+### 🔬 التحليلات الطبية المتقدمة
+- **CASA (تحليل الحيوانات المنوية)**: تحليل فيديو متقدم مع خوارزميات Kalman Filter + Hungarian Algorithm
+- **CBC (تحليل الدم الشامل)**: تحليل شامل مع قيم مرجعية وتحديد الأنماط المرضية
+- **تحليل البول**: فحص شامل للبول مع تحليل مجهري وكيميائي
+- **تحليل البراز**: فحص البراز مع تحليل الطفيليات والالتهابات
 
-### 🎯 Professional Calibration System
-- **Microscope Calibration**: Precise µm/pixel conversion with validation
-- **Multiple Calibrations**: Support for different objectives and camera setups
-- **Calibration History**: Track and manage calibration changes over time
-- **Quality Assurance**: Built-in validation and error checking
+### 🎯 نظام الصلاحيات المتدرج
+- **مدير النظام**: صلاحيات كاملة على جميع الوظائف
+- **فني المختبر**: تحليل العينات، إدخال النتائج، طباعة التقارير
+- **مستقبل**: إدارة المرضى وحجز المواعيد فقط
 
-### 📊 Advanced Analytics
-- **Individual Track Analysis**: Detailed analysis of each sperm track
-- **Quality Scoring**: Automated quality assessment of tracking results
-- **Statistical Analysis**: Comprehensive statistical summaries and ranges
-- **Export Capabilities**: CSV, PDF, and Excel export formats
+### 📊 نظام التقارير المتقدم
+- **تقارير PDF**: إنشاء تقارير احترافية باللغة العربية
+- **تصدير Excel**: تصدير البيانات إلى ملفات Excel
+- **أرشفة تلقائية**: حفظ نسخ من جميع التقارير
+- **إحصائيات شاملة**: تحليلات إحصائية للبيانات
 
-### 🔒 Medical Compliance
-- **Comprehensive Audit Logging**: Full traceability of all operations
-- **User Authentication**: Secure access control
-- **Data Integrity**: Validation and error handling throughout
-- **Regulatory Compliance**: Designed for medical laboratory standards
+### 🔒 الأمان والتدقيق
+- **نظام AuditLog**: تسجيل كامل لجميع العمليات
+- **تشفير كلمات المرور**: استخدام BCrypt للتشفير
+- **إدارة الجلسات**: نظام جلسات آمن
+- **نسخ احتياطية**: نظام نسخ احتياطي تلقائي
 
-### 🛠️ Technical Excellence
-- **Modern Architecture**: .NET 8.0 with WPF and Material Design
-- **Computer Vision**: Emgu.CV (OpenCV) integration for video processing
-- **Database**: SQLite with Dapper ORM for reliable data storage
-- **Offline Capability**: Complete offline installation and operation
+## 🛠️ المتطلبات التقنية
 
-## 🚀 Quick Start
+### متطلبات النظام
+- **Windows 10/11** أو أحدث
+- **.NET 8.0 Desktop Runtime**
+- **4 GB RAM** كحد أدنى
+- **2 GB مساحة خالية** على القرص الصلب
 
-### Prerequisites
-- Windows 10 or later
-- .NET 8.0 Runtime
-- 4GB RAM minimum
-- 2GB free disk space
+### المكتبات المطلوبة
+```
+Emgu.CV 4.8.1.5350 (معالجة الفيديو والصور)
+System.Data.SQLite.Core 1.0.118 (قاعدة البيانات)
+Dapper 2.1.15 (ORM)
+BCrypt.Net-Next 4.0.3 (تشفير كلمات المرور)
+PdfSharp-MigraDoc 1.50.5147 (إنشاء PDF)
+EPPlus 7.0.5 (تصدير Excel)
+Microsoft.Extensions.Logging 8.0.0 (التسجيل)
+Serilog 3.1.1 (تسجيل متقدم)
+FluentValidation 11.8.1 (التحقق من البيانات)
+AutoMapper 12.0.1 (تحويل البيانات)
+```
 
-### Installation
+## 🚀 التثبيت والتشغيل
 
-#### Option 1: Download Pre-built Package
-1. Download the latest release from [Releases](https://github.com/your-repo/releases)
-2. Extract the ZIP file
-3. Run `MedicalLabAnalyzer.exe`
+### 1. تحميل وتثبيت .NET 8.0
+```bash
+# تحميل .NET 8.0 Desktop Runtime من Microsoft
+# https://dotnet.microsoft.com/download/dotnet/8.0
+```
 
-#### Option 2: Build from Source
+### 2. بناء المشروع
 ```powershell
-# Clone the repository
-git clone https://github.com/your-repo/medical-lab-analyzer.git
-cd medical-lab-analyzer
+# فتح PowerShell في مجلد المشروع
+cd C:\MedicalLabAnalyzer
 
-# Run the build script
+# بناء المشروع
+dotnet build --configuration Release
+
+# أو استخدام سكربت البناء
 .\build_offline.ps1
-
-# The application will be built to the 'install' directory
 ```
 
-### First Run Setup
-1. **Calibration**: Set up microscope calibration using a calibration slide
-2. **Sample Video**: Place your sperm analysis video in the `Samples` folder
-3. **Analysis**: Run CASA analysis and review results
+### 3. تشغيل التطبيق
+```bash
+# تشغيل التطبيق
+dotnet run --configuration Release
 
-## 📋 System Requirements
-
-### Hardware
-- **Processor**: Intel i5 or AMD equivalent (2.0 GHz or higher)
-- **Memory**: 4GB RAM minimum, 8GB recommended
-- **Storage**: 2GB free space
-- **Display**: 1920x1080 minimum resolution
-
-### Software
-- **Operating System**: Windows 10/11 (64-bit)
-- **Runtime**: .NET 8.0 Desktop Runtime
-- **Video Codecs**: H.264, MPEG-4 support
-
-## 🔧 Configuration
-
-### Calibration Setup
-1. Use a calibration slide with known distances (e.g., 100 µm)
-2. Measure the pixel distance between calibration marks
-3. Calculate µm/pixel ratio: `MicronsPerPixel = KnownDistance / MeasuredPixels`
-4. Enter values in the calibration interface
-
-### Analysis Parameters
-- **Min Blob Area**: Minimum sperm head size (pixels)
-- **Max Match Distance**: Maximum tracking distance between frames
-- **Max Missed Frames**: Maximum frames a track can be missed
-- **Min Track Duration**: Minimum track duration for analysis
-- **Smoothing Window**: Path smoothing window size
-
-## 📊 CASA Parameters Explained
-
-### Velocity Parameters
-- **VCL (Curvilinear Velocity)**: Total path length / time (µm/s)
-- **VSL (Straight Line Velocity)**: Straight line distance / time (µm/s)
-- **VAP (Average Path Velocity)**: Smoothed path length / time (µm/s)
-
-### Movement Parameters
-- **ALH (Amplitude of Lateral Head)**: Side-to-side head movement (µm)
-- **BCF (Beat Cross Frequency)**: Frequency of crossing average path (Hz)
-- **LIN (Linearity)**: VSL/VCL ratio (straightness)
-- **STR (Straightness)**: VSL/VAP ratio
-- **WOB (Wobble)**: VAP/VCL ratio (path regularity)
-
-## 🧪 Testing
-
-### Run CASA Analysis Test
-```csharp
-// In your application or test environment
-MedicalLabAnalyzer.Tests.CasaAnalysisRealTest.RunReal(
-    videoPath: "path/to/your/video.mp4",
-    outputPath: "results.csv"
-);
+# أو تشغيل الملف التنفيذي مباشرة
+.\bin\Release\net8.0-windows\MedicalLabAnalyzer.exe
 ```
 
-### Calibration Test
-```csharp
-MedicalLabAnalyzer.Tests.CasaAnalysisRealTest.RunCalibrationTest();
+## 👥 المستخدمين الافتراضيين
+
+| المستخدم | كلمة المرور | الدور | الصلاحيات |
+|-----------|-------------|-------|------------|
+| `admin` | `admin` | مدير النظام | جميع الصلاحيات |
+| `lab` | `123` | فني المختبر | تحليل العينات والتقارير |
+| `reception` | `123` | مستقبل | إدارة المرضى والمواعيد |
+
+## 📋 دليل الاستخدام
+
+### 🔬 تحليل CASA (الحيوانات المنوية)
+
+1. **تسجيل الدخول** كفني مختبر أو مدير
+2. **فتح شاشة المعايرة** من القائمة الجانبية
+3. **تحميل فيديو العينة** (صيغ مدعومة: MP4, AVI)
+4. **إدخال معامل المعايرة** (ميكرون/بكسل)
+5. **بدء التحليل** - النظام سيقوم بـ:
+   - استخراج المسارات باستخدام Kalman Filter
+   - تطبيق Hungarian Algorithm للتتبع
+   - حساب VCL, VSL, VAP, ALH, BCF
+   - إنشاء تقرير مفصل
+
+### 🩸 تحليل CBC (الدم الشامل)
+
+1. **إضافة فحص جديد** من إدارة الفحوصات
+2. **اختيار نوع الفحص**: CBC
+3. **إدخال القيم**:
+   - WBC, RBC, Hemoglobin, Hematocrit, Platelets
+   - MCV, MCH, MCHC, RDW
+   - Neutrophils, Lymphocytes, Monocytes, Eosinophils, Basophils
+4. **حفظ النتائج** - النظام سيقوم بـ:
+   - التحقق من القيم المرجعية
+   - تحديد الحالة (Normal/Abnormal/Critical)
+   - تحليل الأنماط المرضية
+   - إنشاء تقرير شامل
+
+### 🧪 تحليل البول
+
+1. **إضافة فحص بول جديد**
+2. **إدخال الخصائص الفيزيائية**:
+   - اللون، الشفافية، pH، الكثافة النوعية
+3. **إدخال الفحوصات الكيميائية**:
+   - البروتين، الجلوكوز، الكيتونات، الدم، الكريات البيضاء
+4. **إدخال الفحص المجهري**:
+   - RBC, WBC, الخلايا الظهارية، القوالب، البلورات
+5. **حفظ النتائج** - النظام سيقوم بـ:
+   - تحديد وجود UTI
+   - تحليل البيلة الدموية
+   - تحديد البيلة البروتينية
+   - إنشاء تقرير مفصل
+
+### 💩 تحليل البراز
+
+1. **إضافة فحص براز جديد**
+2. **إدخال الخصائص الفيزيائية**:
+   - اللون، التماسك، الشكل، الوزن، الرائحة
+3. **إدخال الفحوصات الكيميائية**:
+   - الدم الخفي، pH، المواد المختزلة، محتوى الدهون
+4. **إدخال الفحص المجهري**:
+   - المخاط، الطعام غير المهضوم، الألياف العضلية
+   - النشا، كريات الدهون، الطفيليات، البويضات
+5. **إدخال الفحوصات الإضافية**:
+   - Calprotectin, Lactoferrin, Alpha1-Antitrypsin
+6. **حفظ النتائج** - النظام سيقوم بـ:
+   - تحديد النزيف الهضمي
+   - تحليل العدوى الطفيلية
+   - تحديد التهاب الأمعاء
+   - تحليل سوء الامتصاص
+
+## 📊 التقارير والإحصائيات
+
+### أنواع التقارير
+- **تقرير CASA**: VCL, VSL, VAP, ALH, BCF مع الرسوم البيانية
+- **تقرير CBC**: جميع مؤشرات الدم مع القيم المرجعية
+- **تقرير البول**: الفحوصات الكيميائية والمجهري
+- **تقرير البراز**: الفحوصات الشاملة مع تحليل الطفيليات
+- **التقرير الإحصائي**: إحصائيات شاملة للفترة المحددة
+
+### تصدير البيانات
+- **PDF**: تقارير احترافية باللغة العربية
+- **Excel**: بيانات منظمة قابلة للتحليل
+- **CSV**: بيانات خام للتحليل الإحصائي
+
+## 🔧 الإعدادات والتكوين
+
+### إعداد قاعدة البيانات
+```sql
+-- إنشاء قاعدة البيانات تلقائياً
+-- الملف: Database/medical_lab.db
+-- النسخ الاحتياطي: Database/Backup/
 ```
 
-## 📁 Project Structure
-
-```
-MedicalLabAnalyzer/
-├── src/
-│   └── MedicalLabAnalyzer/
-│       ├── Helpers/
-│       │   ├── HungarianAlgorithm.cs      # Optimal assignment algorithm
-│       │   ├── KalmanTrack.cs            # Kalman filter tracking
-│       │   └── MultiTracker.cs           # Multi-object tracker
-│       ├── Models/
-│       │   ├── TrackPoint.cs             # Track point model
-│       │   └── CASA_Result.cs            # Analysis results
-│       ├── Services/
-│       │   ├── ImageAnalysisService.cs   # Video analysis engine
-│       │   ├── CalibrationService.cs     # Calibration management
-│       │   └── AuditLogger.cs            # Audit logging
-│       └── Tests/
-│           └── CasaAnalysisRealTest.cs   # Real-world testing
-├── Database/                             # SQLite database
-├── Samples/                              # Sample videos
-├── build_offline.ps1                     # Build script
-└── README.md
+### إعداد التسجيل
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning"
+    }
+  },
+  "Serilog": {
+    "WriteTo": [
+      {
+        "Name": "File",
+        "Args": {
+          "path": "Logs/app-.log",
+          "rollingInterval": "Day"
+        }
+      }
+    ]
+  }
+}
 ```
 
-## 🔬 Technical Architecture
-
-### Computer Vision Pipeline
-1. **Video Input**: Load and validate video file
-2. **Preprocessing**: Grayscale conversion, Gaussian blur
-3. **Background Subtraction**: MOG2 algorithm for motion detection
-4. **Morphological Operations**: Noise reduction and blob enhancement
-5. **Contour Detection**: Find sperm head candidates
-6. **Multi-Object Tracking**: Kalman filter + Hungarian algorithm
-7. **Path Analysis**: Calculate CASA parameters
-8. **Quality Assessment**: Evaluate track quality and consistency
-
-### Data Flow
+### إعداد التقارير
 ```
-Video File → Preprocessing → Detection → Tracking → Analysis → Results
-     ↓              ↓            ↓          ↓         ↓         ↓
-  Validation    Background   Contours   Kalman    CASA      Export
-                Subtraction            Filters   Metrics
+Reports/
+├── Templates/          # قوالب التقارير
+├── Archive/           # أرشيف التقارير
+└── Output/            # التقارير المولدة
 ```
 
-## 📈 Performance
+## 🧪 الاختبارات والتحقق
 
-### Benchmarks
-- **Processing Speed**: ~30 FPS on standard hardware
-- **Memory Usage**: <500MB for typical analysis
-- **Accuracy**: >95% tracking accuracy in good quality videos
-- **Scalability**: Handles 100+ simultaneous tracks
+### تشغيل الاختبارات
+```bash
+# تشغيل جميع الاختبارات
+dotnet test
 
-### Optimization
-- **Parallel Processing**: Multi-threaded video analysis
-- **Memory Management**: Efficient resource usage
-- **Caching**: Intelligent caching of intermediate results
-- **GPU Acceleration**: Optional GPU acceleration for large videos
+# تشغيل اختبار CASA الحقيقي
+dotnet test --filter "CasaAnalysisRealTest"
 
-## 🔒 Security & Compliance
-
-### Audit Logging
-- **User Actions**: All user actions logged with timestamps
-- **Analysis Events**: Complete analysis history and parameters
-- **Calibration Changes**: Track calibration modifications
-- **Export Capabilities**: CSV export for compliance reporting
-
-### Data Protection
-- **Local Storage**: All data stored locally
-- **No Cloud Dependencies**: Complete offline operation
-- **Encryption**: Sensitive data encryption
-- **Access Control**: Role-based access management
-
-## 🛠️ Development
-
-### Building from Source
-```powershell
-# Install .NET 8.0 SDK
-# Clone repository
-git clone https://github.com/your-repo/medical-lab-analyzer.git
-
-# Build with offline package creation
-.\build_offline.ps1 -Configuration Release -CreateInstaller
-
-# Run tests
-.\run_tests.bat
+# تشغيل اختبار المعايرة
+dotnet test --filter "CalibrationTest"
 ```
 
-### Dependencies
-- **Emgu.CV**: Computer vision and video processing
-- **Dapper**: Database ORM
-- **MaterialDesignThemes**: Modern UI framework
-- **Serilog**: Structured logging
-- **FluentValidation**: Input validation
+### اختبار تحليل الفيديو
+1. **وضع فيديو عينة** في مجلد `Samples/`
+2. **تسمية الملف**: `sperm_sample.mp4`
+3. **تشغيل الاختبار**:
+   ```csharp
+   CasaAnalysisRealTest.RunReal();
+   ```
 
-### Contributing
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Submit a pull request
+## 🔒 الأمان والامتثال
 
-## 📞 Support
+### معايير الأمان
+- **تشفير كلمات المرور**: BCrypt مع Salt
+- **إدارة الجلسات**: رموز جلسات آمنة
+- **تسجيل العمليات**: AuditLog شامل
+- **نسخ احتياطية**: تلقائية ومشفرة
 
-### Documentation
-- **User Manual**: Comprehensive user guide
-- **API Documentation**: Technical documentation
-- **Video Tutorials**: Step-by-step tutorials
-- **FAQ**: Common questions and answers
+### الامتثال الطبي
+- **IEC 62304**: دورة حياة برمجيات الأجهزة الطبية
+- **ISO 13485**: أنظمة إدارة الجودة للأجهزة الطبية
+- **ISO 14971**: إدارة المخاطر
+- **HIPAA**: حماية البيانات الصحية (إذا كان مطلوباً)
 
-### Contact
-- **Email**: support@medicallabsolutions.com
-- **Issues**: GitHub Issues for bug reports
-- **Discussions**: GitHub Discussions for questions
+## 🐛 استكشاف الأخطاء
 
-## 📄 License
+### مشاكل شائعة وحلولها
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+#### التطبيق لا يعمل
+```bash
+# التحقق من تثبيت .NET 8.0
+dotnet --version
 
-## ⚠️ Medical Disclaimer
+# إعادة بناء المشروع
+dotnet clean
+dotnet restore
+dotnet build
+```
 
-**Important**: This software is designed for research and educational purposes. For clinical use, proper validation and regulatory approval are required. Always consult with qualified medical professionals before using this software for diagnostic purposes.
+#### قاعدة البيانات لا تُحفظ
+```bash
+# التحقق من صلاحيات المجلد
+# التأكد من وجود مجلد Database/
+# التحقق من صلاحيات الكتابة
+```
 
-## 🔄 Version History
+#### الفيديو لا يُحلل
+```bash
+# التحقق من صيغة الفيديو (MP4, AVI)
+# التأكد من وجود EmguCV DLLs
+# التحقق من معامل المعايرة
+```
 
-### v1.0.0 (Current)
-- ✅ Advanced Kalman filter tracking
-- ✅ Hungarian algorithm for optimal assignment
-- ✅ Comprehensive CASA parameter calculation
-- ✅ Professional calibration system
-- ✅ Complete audit logging
-- ✅ Offline installation capability
-- ✅ Modern WPF interface with Material Design
+#### مشاكل Crystal Reports
+```bash
+# تثبيت Crystal Reports Runtime
+# التحقق من إعدادات الطباعة
+# التأكد من وجود قوالب التقارير
+```
 
-### Planned Features
-- 🔄 GPU acceleration support
-- 🔄 Batch processing capabilities
-- 🔄 Advanced reporting templates
-- 🔄 Network deployment options
-- 🔄 Mobile companion app
+## 📞 الدعم والمساعدة
+
+### التوثيق
+- **دليل المستخدم**: `docs/UserGuide.md`
+- **دليل المطور**: `docs/DeveloperGuide.md`
+- **API Documentation**: `docs/API.md`
+
+### الاتصال
+- **البريد الإلكتروني**: support@medicallab.com
+- **الهاتف**: +966-XX-XXXXXXX
+- **الدعم الفني**: متاح 24/7
+
+## 📄 الترخيص
+
+هذا المشروع مرخص تحت **MIT License**. راجع ملف `LICENSE` للتفاصيل.
+
+## ⚠️ تحذيرات مهمة
+
+### تحذير طبي
+```
+هذا النظام مصمم للمساعدة في التحليل المختبري ولا يغني عن 
+التشخيص الطبي المهني. جميع النتائج يجب مراجعتها من قبل 
+طبيب مختص قبل اتخاذ أي قرارات علاجية.
+```
+
+### تحذير تقني
+```
+هذا النظام يتطلب تحققاً سريرياً شاملاً قبل الاستخدام 
+في البيئة الإنتاجية. يرجى إجراء الاختبارات المطلوبة 
+والتأكد من الامتثال للمعايير الطبية المحلية.
+```
+
+## 🔄 التحديثات والإصدارات
+
+### الإصدار الحالي: v1.0.0
+- ✅ نظام CASA متقدم مع Kalman + Hungarian
+- ✅ تحليلات CBC, Urine, Stool شاملة
+- ✅ نظام صلاحيات متدرج
+- ✅ تقارير PDF/Excel متقدمة
+- ✅ نظام AuditLog شامل
+- ✅ واجهة عربية RTL كاملة
+
+### التحديثات القادمة: v1.1.0
+- 🔄 دعم تحليلات إضافية
+- 🔄 واجهة ويب متقدمة
+- 🔄 تكامل مع أنظمة المستشفيات
+- 🔄 تحليلات ذكية باستخدام AI
+- 🔄 تطبيق موبايل
 
 ---
 
-**Medical Lab Analyzer** - Professional CASA Analysis System  
-*Built with ❤️ for medical research and laboratory excellence*
+**MedicalLabAnalyzer** - نظام إدارة مختبر طبي متقدم ومتكامل 🏥
