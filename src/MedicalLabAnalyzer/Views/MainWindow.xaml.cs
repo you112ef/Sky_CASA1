@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using MedicalLabAnalyzer.Services;
 using MedicalLabAnalyzer.Models;
+using MedicalLabAnalyzer.Views;
 using System.Threading.Tasks;
 
 namespace MedicalLabAnalyzer.Views
@@ -280,24 +281,12 @@ namespace MedicalLabAnalyzer.Views
 
         private void ShowPatients()
         {
-            contentFrame.Content = new TextBlock
-            {
-                Text = "Patients Management - إدارة المرضى\n\nPatient management interface will be implemented here\nسيتم تنفيذ واجهة إدارة المرضى هنا",
-                FontSize = 16,
-                TextAlignment = TextAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+            contentFrame.Content = new PatientManagementView();
         }
 
         private void ShowExams()
         {
-            contentFrame.Content = new TextBlock
-            {
-                Text = "Exams Management - إدارة الفحوصات\n\nExam management interface will be implemented here\nسيتم تنفيذ واجهة إدارة الفحوصات هنا",
-                FontSize = 16,
-                TextAlignment = TextAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+            contentFrame.Content = new ExamManagementView();
         }
 
         private void ShowVideoAnalysis()
@@ -313,13 +302,7 @@ namespace MedicalLabAnalyzer.Views
 
         private void ShowReports()
         {
-            contentFrame.Content = new TextBlock
-            {
-                Text = "Reports - التقارير\n\nReports interface will be implemented here\nسيتم تنفيذ واجهة التقارير هنا",
-                FontSize = 16,
-                TextAlignment = TextAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+            contentFrame.Content = new ReportsView();
         }
 
         private void ShowSettings()
