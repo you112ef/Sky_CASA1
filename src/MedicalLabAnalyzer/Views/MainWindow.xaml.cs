@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Windows;
 using System.Windows.Controls;
-using MedicalLabAnalyzer.ViewModels;
 using MedicalLabAnalyzer.Services;
 using MedicalLabAnalyzer.Models;
 using System.Threading.Tasks;
@@ -14,7 +13,7 @@ namespace MedicalLabAnalyzer.Views
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<MainWindow> _logger;
-        private readonly IAuthenticationService _authService;
+        private readonly AuthService _authService;
         private User? _currentUser;
 
         public MainWindow(IServiceProvider serviceProvider)
@@ -22,7 +21,7 @@ namespace MedicalLabAnalyzer.Views
             InitializeComponent();
             _serviceProvider = serviceProvider;
             _logger = serviceProvider.GetRequiredService<ILogger<MainWindow>>();
-            _authService = serviceProvider.GetRequiredService<IAuthenticationService>();
+            _authService = serviceProvider.GetRequiredService<AuthService>();
 
             Loaded += MainWindow_Loaded;
             InitializeNavigation();
@@ -35,7 +34,7 @@ namespace MedicalLabAnalyzer.Views
                 ShowLoading(true);
                 
                 // Check if user is authenticated
-                _currentUser = await _authService.GetCurrentUserAsync();
+                _currentUser = _authService.CurrentUser;
                 if (_currentUser == null)
                 {
                     // Show login dialog
@@ -45,7 +44,7 @@ namespace MedicalLabAnalyzer.Views
                         Application.Current.Shutdown();
                         return;
                     }
-                    _currentUser = await _authService.GetCurrentUserAsync();
+                    _currentUser = _authService.CurrentUser;
                 }
 
                 UpdateUserInfo();
@@ -78,7 +77,7 @@ namespace MedicalLabAnalyzer.Views
             if (_currentUser != null)
             {
                 txtUserName.Text = $"Welcome {_currentUser.FullName} - مرحباً {_currentUser.FullName}";
-                txtUserRole.Text = $"{_currentUser.Role} - {GetRoleInArabic(_currentUser.Role)}";
+                txtUserRole.Text = $"{_currentUser.RoleName} - {GetRoleInArabic(_currentUser.RoleName)}";
                 
                 // Update button permissions based on user role
                 UpdateButtonPermissions();
@@ -90,9 +89,8 @@ namespace MedicalLabAnalyzer.Views
             return role switch
             {
                 "Admin" => "مدير",
-                "Doctor" => "طبيب",
-                "Technician" => "فني",
-                "User" => "مستخدم",
+                "LabTech" => "فني مختبر",
+                "Reception" => "استقبال",
                 _ => role
             };
         }
@@ -101,140 +99,45 @@ namespace MedicalLabAnalyzer.Views
         {
             if (_currentUser == null) return;
 
-            btnPatients.IsEnabled = _currentUser.HasPermission("ViewPatients");
-            btnExams.IsEnabled = _currentUser.HasPermission("ViewExams");
-            btnVideoAnalysis.IsEnabled = _currentUser.HasPermission("VideoAnalysis");
-            btnReports.IsEnabled = _currentUser.HasPermission("ViewReports");
-            btnSettings.IsEnabled = _currentUser.IsAdmin;
-            btnBackup.IsEnabled = _currentUser.IsAdmin;
-        }
-
-        private async void NavigationButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button button && button.Tag is string pageName)
+            var role = _currentUser.RoleName?.ToLower();
+            
+            // Admin has access to everything
+            if (role == "admin")
             {
-                await NavigateToPageAsync(pageName);
+                btnDashboard.IsEnabled = true;
+                btnPatients.IsEnabled = true;
+                btnExams.IsEnabled = true;
+                btnVideoAnalysis.IsEnabled = true;
+                btnReports.IsEnabled = true;
+                btnSettings.IsEnabled = true;
+                btnBackup.IsEnabled = true;
+                return;
             }
-        }
 
-        private async Task NavigateToPageAsync(string pageName)
-        {
-            try
+            // LabTech permissions
+            if (role == "labtech")
             {
-                ShowLoading(true);
-                await NavigateToPage(pageName);
-                ShowLoading(false);
+                btnDashboard.IsEnabled = true;
+                btnPatients.IsEnabled = true;
+                btnExams.IsEnabled = true;
+                btnVideoAnalysis.IsEnabled = true;
+                btnReports.IsEnabled = true;
+                btnSettings.IsEnabled = false;
+                btnBackup.IsEnabled = false;
+                return;
             }
-            catch (Exception ex)
+
+            // Reception permissions
+            if (role == "reception")
             {
-                _logger.LogError(ex, "Error navigating to page: {PageName}", pageName);
-                MessageBox.Show($"Error navigating to page: {ex.Message}", "Error", 
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-                ShowLoading(false);
-            }
-        }
-
-        private async Task NavigateToPage(string pageName)
-        {
-            try
-            {
-                txtPageTitle.Text = GetPageTitle(pageName);
-                
-                switch (pageName.ToLower())
-                {
-                    case "dashboard":
-                        var dashboardView = _serviceProvider.GetRequiredService<DashboardView>();
-                        MainFrame.Navigate(dashboardView);
-                        break;
-
-                    case "patients":
-                        var patientsView = _serviceProvider.GetRequiredService<PatientsView>();
-                        MainFrame.Navigate(patientsView);
-                        break;
-
-                    case "exams":
-                        var examsView = _serviceProvider.GetRequiredService<ExamsView>();
-                        MainFrame.Navigate(examsView);
-                        break;
-
-                    case "videoanalysis":
-                        var videoAnalysisView = _serviceProvider.GetRequiredService<VideoAnalysisView>();
-                        MainFrame.Navigate(videoAnalysisView);
-                        break;
-
-                    case "reports":
-                        var reportsView = _serviceProvider.GetRequiredService<ReportsView>();
-                        MainFrame.Navigate(reportsView);
-                        break;
-
-                    case "settings":
-                        var settingsView = _serviceProvider.GetRequiredService<SettingsView>();
-                        MainFrame.Navigate(settingsView);
-                        break;
-
-                    case "backup":
-                        var backupView = _serviceProvider.GetRequiredService<BackupView>();
-                        MainFrame.Navigate(backupView);
-                        break;
-
-                    default:
-                        var dashboardViewDefault = _serviceProvider.GetRequiredService<DashboardView>();
-                        MainFrame.Navigate(dashboardViewDefault);
-                        break;
-                }
-
-                // Update navigation button states
-                UpdateNavigationButtonStates(pageName);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error navigating to page: {PageName}", pageName);
-                throw;
-            }
-        }
-
-        private string GetPageTitle(string pageName)
-        {
-            return pageName.ToLower() switch
-            {
-                "dashboard" => "Dashboard - لوحة التحكم",
-                "patients" => "Patients Management - إدارة المرضى",
-                "exams" => "Exams Management - إدارة الفحوصات",
-                "videoanalysis" => "Video Analysis - تحليل الفيديو",
-                "reports" => "Reports - التقارير",
-                "settings" => "Settings - الإعدادات",
-                "backup" => "Backup & Restore - النسخ الاحتياطي",
-                _ => "Dashboard - لوحة التحكم"
-            };
-        }
-
-        private void UpdateNavigationButtonStates(string activePage)
-        {
-            // Reset all buttons
-            btnDashboard.Style = FindResource("NavigationButtonStyle") as Style;
-            btnPatients.Style = FindResource("NavigationButtonStyle") as Style;
-            btnExams.Style = FindResource("NavigationButtonStyle") as Style;
-            btnVideoAnalysis.Style = FindResource("NavigationButtonStyle") as Style;
-            btnReports.Style = FindResource("NavigationButtonStyle") as Style;
-            btnSettings.Style = FindResource("NavigationButtonStyle") as Style;
-            btnBackup.Style = FindResource("NavigationButtonStyle") as Style;
-
-            // Highlight active button
-            var activeButton = activePage.ToLower() switch
-            {
-                "dashboard" => btnDashboard,
-                "patients" => btnPatients,
-                "exams" => btnExams,
-                "videoanalysis" => btnVideoAnalysis,
-                "reports" => btnReports,
-                "settings" => btnSettings,
-                "backup" => btnBackup,
-                _ => btnDashboard
-            };
-
-            if (activeButton != null)
-            {
-                activeButton.Style = FindResource("MaterialDesignRaisedButton") as Style;
+                btnDashboard.IsEnabled = true;
+                btnPatients.IsEnabled = true;
+                btnExams.IsEnabled = true;
+                btnVideoAnalysis.IsEnabled = false;
+                btnReports.IsEnabled = false;
+                btnSettings.IsEnabled = false;
+                btnBackup.IsEnabled = false;
+                return;
             }
         }
 
@@ -242,72 +145,273 @@ namespace MedicalLabAnalyzer.Views
         {
             try
             {
-                var loginView = _serviceProvider.GetRequiredService<LoginView>();
-                var loginWindow = new Window
-                {
-                    Title = "Login - تسجيل الدخول",
-                    Content = loginView,
-                    Width = 400,
-                    Height = 500,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                    Owner = this,
-                    ResizeMode = ResizeMode.NoResize,
-                    WindowStyle = WindowStyle.ToolWindow
-                };
-
+                // Simple login dialog for now
+                var loginWindow = new LoginDialog();
                 var result = loginWindow.ShowDialog();
-                return result == true;
+                
+                if (result == true)
+                {
+                    var user = _authService.Authenticate(loginWindow.Username, loginWindow.Password);
+                    if (user != null)
+                    {
+                        _currentUser = user;
+                        return true;
+                    }
+                    else
+                    {
+                        MessageBox.Show("Invalid username or password", "Login Failed", 
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return await ShowLoginDialogAsync();
+                    }
+                }
+                
+                return false;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error showing login dialog");
+                _logger.LogError(ex, "Error during login");
+                MessageBox.Show($"Login error: {ex.Message}", "Error", 
+                    MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
         }
 
-        private async void btnLogout_Click(object sender, RoutedEventArgs e)
+        private void NavigateToPage(string pageName)
         {
             try
             {
-                var result = MessageBox.Show("Are you sure you want to logout? - هل أنت متأكد من تسجيل الخروج؟", 
-                    "Confirm Logout - تأكيد تسجيل الخروج", 
-                    MessageBoxButton.YesNo, MessageBoxImage.Question);
-
-                if (result == MessageBoxResult.Yes)
+                // Hide all content frames
+                contentFrame.Content = null;
+                
+                switch (pageName.ToLower())
                 {
-                    await _authService.LogoutAsync();
-                    _currentUser = null;
-                    
-                    // Show login dialog again
-                    var loginResult = await ShowLoginDialogAsync();
-                    if (!loginResult)
-                    {
-                        Application.Current.Shutdown();
-                        return;
-                    }
-                    
-                    _currentUser = await _authService.GetCurrentUserAsync();
-                    UpdateUserInfo();
-                    NavigateToPage("Dashboard");
+                    case "dashboard":
+                        ShowDashboard();
+                        break;
+                    case "patients":
+                        ShowPatients();
+                        break;
+                    case "exams":
+                        ShowExams();
+                        break;
+                    case "videoanalysis":
+                        ShowVideoAnalysis();
+                        break;
+                    case "reports":
+                        ShowReports();
+                        break;
+                    case "settings":
+                        ShowSettings();
+                        break;
+                    case "backup":
+                        ShowBackup();
+                        break;
+                    default:
+                        ShowDashboard();
+                        break;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during logout");
-                MessageBox.Show($"Error during logout: {ex.Message}", "Error", 
+                _logger.LogError(ex, $"Error navigating to page: {pageName}");
+                MessageBox.Show($"Navigation error: {ex.Message}", "Error", 
                     MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private void ShowLoading(bool show)
+        private void ShowDashboard()
         {
-            LoadingOverlay.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            contentFrame.Content = new TextBlock
+            {
+                Text = "Dashboard - لوحة التحكم\n\nWelcome to Medical Lab Analyzer\nمرحباً بك في محلل المختبر الطبي",
+                FontSize = 18,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
         }
 
-        protected override void OnClosed(EventArgs e)
+        private void ShowPatients()
         {
-            _logger.LogInformation("Main window closed");
-            base.OnClosed(e);
+            contentFrame.Content = new TextBlock
+            {
+                Text = "Patients Management - إدارة المرضى\n\nPatient management interface will be implemented here\nسيتم تنفيذ واجهة إدارة المرضى هنا",
+                FontSize = 16,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+        }
+
+        private void ShowExams()
+        {
+            contentFrame.Content = new TextBlock
+            {
+                Text = "Exams Management - إدارة الفحوصات\n\nExam management interface will be implemented here\nسيتم تنفيذ واجهة إدارة الفحوصات هنا",
+                FontSize = 16,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+        }
+
+        private void ShowVideoAnalysis()
+        {
+            contentFrame.Content = new TextBlock
+            {
+                Text = "Video Analysis - تحليل الفيديو\n\nVideo analysis interface will be implemented here\nسيتم تنفيذ واجهة تحليل الفيديو هنا",
+                FontSize = 16,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+        }
+
+        private void ShowReports()
+        {
+            contentFrame.Content = new TextBlock
+            {
+                Text = "Reports - التقارير\n\nReports interface will be implemented here\nسيتم تنفيذ واجهة التقارير هنا",
+                FontSize = 16,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+        }
+
+        private void ShowSettings()
+        {
+            contentFrame.Content = new TextBlock
+            {
+                Text = "Settings - الإعدادات\n\nSettings interface will be implemented here\nسيتم تنفيذ واجهة الإعدادات هنا",
+                FontSize = 16,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+        }
+
+        private void ShowBackup()
+        {
+            contentFrame.Content = new TextBlock
+            {
+                Text = "Backup & Restore - النسخ الاحتياطي والاستعادة\n\nBackup interface will be implemented here\nسيتم تنفيذ واجهة النسخ الاحتياطي هنا",
+                FontSize = 16,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+        }
+
+        private void ShowLoading(bool show)
+        {
+            if (loadingOverlay != null)
+            {
+                loadingOverlay.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        // Navigation button click handlers
+        private void btnDashboard_Click(object sender, RoutedEventArgs e) => NavigateToPage("Dashboard");
+        private void btnPatients_Click(object sender, RoutedEventArgs e) => NavigateToPage("Patients");
+        private void btnExams_Click(object sender, RoutedEventArgs e) => NavigateToPage("Exams");
+        private void btnVideoAnalysis_Click(object sender, RoutedEventArgs e) => NavigateToPage("VideoAnalysis");
+        private void btnReports_Click(object sender, RoutedEventArgs e) => NavigateToPage("Reports");
+        private void btnSettings_Click(object sender, RoutedEventArgs e) => NavigateToPage("Settings");
+        private void btnBackup_Click(object sender, RoutedEventArgs e) => NavigateToPage("Backup");
+
+        private void btnLogout_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _authService.Logout();
+                _currentUser = null;
+                
+                // Show login dialog again
+                ShowLoginDialogAsync().ContinueWith(async task =>
+                {
+                    if (await task)
+                    {
+                        _currentUser = _authService.CurrentUser;
+                        UpdateUserInfo();
+                        NavigateToPage("Dashboard");
+                    }
+                    else
+                    {
+                        Application.Current.Shutdown();
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during logout");
+                MessageBox.Show($"Logout error: {ex.Message}", "Error", 
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    // Simple login dialog
+    public class LoginDialog : Window
+    {
+        public string Username { get; private set; } = "";
+        public string Password { get; private set; } = "";
+
+        public LoginDialog()
+        {
+            Title = "Login - تسجيل الدخول";
+            Width = 300;
+            Height = 200;
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            ResizeMode = ResizeMode.NoResize;
+
+            var grid = new Grid();
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.Margin = new Thickness(20);
+
+            // Username
+            var usernameLabel = new Label { Content = "Username - اسم المستخدم:" };
+            var usernameBox = new TextBox { Name = "txtUsername" };
+            Grid.SetRow(usernameLabel, 0);
+            Grid.SetRow(usernameBox, 1);
+            grid.Children.Add(usernameLabel);
+            grid.Children.Add(usernameBox);
+
+            // Password
+            var passwordLabel = new Label { Content = "Password - كلمة المرور:", Margin = new Thickness(0, 10, 0, 0) };
+            var passwordBox = new PasswordBox { Name = "txtPassword" };
+            Grid.SetRow(passwordLabel, 2);
+            Grid.SetRow(passwordBox, 3);
+            grid.Children.Add(passwordLabel);
+            grid.Children.Add(passwordBox);
+
+            // Buttons
+            var buttonPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 20, 0, 0) };
+            var loginButton = new Button { Content = "Login - دخول", Width = 80, Margin = new Thickness(0, 0, 10, 0) };
+            var cancelButton = new Button { Content = "Cancel - إلغاء", Width = 80 };
+
+            loginButton.Click += (s, e) =>
+            {
+                Username = usernameBox.Text;
+                Password = passwordBox.Password;
+                if (!string.IsNullOrEmpty(Username) && !string.IsNullOrEmpty(Password))
+                {
+                    DialogResult = true;
+                    Close();
+                }
+                else
+                {
+                    MessageBox.Show("Please enter username and password", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            };
+
+            cancelButton.Click += (s, e) =>
+            {
+                DialogResult = false;
+                Close();
+            };
+
+            buttonPanel.Children.Add(loginButton);
+            buttonPanel.Children.Add(cancelButton);
+            grid.Children.Add(buttonPanel);
+
+            Content = grid;
         }
     }
 }

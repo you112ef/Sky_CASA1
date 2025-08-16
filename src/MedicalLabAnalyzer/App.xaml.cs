@@ -5,8 +5,6 @@ using Serilog;
 using System;
 using System.Windows;
 using MedicalLabAnalyzer.Services;
-using MedicalLabAnalyzer.Data;
-using MedicalLabAnalyzer.ViewModels;
 using MedicalLabAnalyzer.Views;
 
 namespace MedicalLabAnalyzer
@@ -37,12 +35,6 @@ namespace MedicalLabAnalyzer
                             builder.AddSerilog();
                         });
 
-                        // Configure Entity Framework
-                        services.AddDbContext<MedicalLabContext>(options =>
-                        {
-                            options.UseSqlite("Data Source=Database/medical_lab.db");
-                        });
-
                         // Register services
                         services.AddScoped<DatabaseService>();
                         services.AddScoped<AuthService>();
@@ -59,12 +51,11 @@ namespace MedicalLabAnalyzer
                 // Initialize database
                 using (var scope = _host.Services.CreateScope())
                 {
-                    var context = scope.ServiceProvider.GetRequiredService<MedicalLabContext>();
-                    await context.Database.EnsureCreatedAsync();
+                    var dbService = scope.ServiceProvider.GetRequiredService<DatabaseService>();
+                    var authService = scope.ServiceProvider.GetRequiredService<AuthService>();
                     
-                    // Seed initial data
-                    var seeder = new DatabaseSeeder(context);
-                    await seeder.SeedAsync();
+                    // Database will be created automatically by DatabaseService
+                    // AuthService will create initial admin user if needed
                 }
 
                 // Get logger
