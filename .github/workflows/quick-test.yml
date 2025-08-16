@@ -1,0 +1,62 @@
+name: Quick Test - MedicalLabAnalyzer
+
+on:
+  push:
+    branches: [ develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 2 * * 1-5'  # Run at 2 AM on weekdays
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  SOLUTION_FILE: 'MedicalLabAnalyzer.sln'
+
+jobs:
+  quick-test:
+    name: Quick Build and Test
+    runs-on: windows-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Clear NuGet cache
+      run: dotnet nuget locals all --clear
+
+    - name: Restore packages
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Build solution
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+    - name: Run quick tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} --configuration Release --no-build --verbosity minimal `
+          --filter "Category!=Integration&Category!=Slow" `
+          --logger "console;verbosity=minimal"
+
+    - name: Check build artifacts
+      run: |
+        Write-Host "Checking build artifacts..."
+        $binPath = "bin/Release/net8.0-windows"
+        if (Test-Path $binPath) {
+          $files = Get-ChildItem $binPath -Recurse -File | Measure-Object -Property Length -Sum
+          Write-Host "Build artifacts found: $($files.Count) files, $([math]::Round($files.Sum / 1MB, 2)) MB"
+        } else {
+          Write-Host "##[warning]No build artifacts found"
+        }
+
+    - name: Upload build artifacts
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: QuickBuild-${{ github.run_number }}
+        path: bin/Release/net8.0-windows/
+        retention-days: 7

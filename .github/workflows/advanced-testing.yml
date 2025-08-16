@@ -1,0 +1,280 @@
+name: Advanced Testing - MedicalLabAnalyzer
+
+on:
+  push:
+    branches: [ main, release/* ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Test Type'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - unit
+        - integration
+        - performance
+        - security
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  SOLUTION_FILE: 'MedicalLabAnalyzer.sln'
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install Chocolatey
+      run: |
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+    - name: Install VC++ Redistributable
+      run: choco install vcredist2019 vcredist2022 -y --no-progress
+
+    - name: Restore packages
+      run: dotnet restore ${{ env.SOLUTION_FILE }}
+
+    - name: Build solution
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+    - name: Run unit tests with coverage
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} --configuration Release --no-build --verbosity normal `
+          --filter "Category=Unit" `
+          --logger "trx;LogFileName=unit_tests.trx" `
+          --logger "console;verbosity=normal" `
+          /p:CollectCoverage=true `
+          /p:CoverletOutputFormat=cobertura `
+          /p:CoverletOutput=./TestResults/unit_coverage.cobertura.xml `
+          /p:Threshold=85 `
+          /p:ThresholdType=line `
+          /p:ThresholdStat=total
+
+    - name: Upload unit test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: UnitTestResults-${{ github.run_number }}
+        path: |
+          **/TestResults/unit_tests.trx
+          **/TestResults/unit_coverage.cobertura.xml
+        retention-days: 30
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: windows-latest
+    timeout-minutes: 30
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        choco install vcredist2019 vcredist2022 -y --no-progress
+
+    - name: Setup test database
+      run: |
+        Write-Host "Setting up test database..."
+        # Create test database directory
+        New-Item -ItemType Directory -Path "TestDatabase" -Force
+        # Copy test data if exists
+        if (Test-Path "Database/test_data.db") {
+          Copy-Item "Database/test_data.db" "TestDatabase/" -Force
+        }
+
+    - name: Run integration tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} --configuration Release --no-build --verbosity normal `
+          --filter "Category=Integration" `
+          --logger "trx;LogFileName=integration_tests.trx" `
+          --logger "console;verbosity=normal" `
+          /p:CollectCoverage=true `
+          /p:CoverletOutputFormat=cobertura `
+          /p:CoverletOutput=./TestResults/integration_coverage.cobertura.xml
+
+    - name: Upload integration test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: IntegrationTestResults-${{ github.run_number }}
+        path: |
+          **/TestResults/integration_tests.trx
+          **/TestResults/integration_coverage.cobertura.xml
+        retention-days: 30
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: windows-latest
+    timeout-minutes: 25
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        choco install vcredist2019 vcredist2022 -y --no-progress
+
+    - name: Build solution
+      run: dotnet build ${{ env.SOLUTION_FILE }} --configuration Release --no-restore
+
+    - name: Run performance tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} --configuration Release --no-build --verbosity normal `
+          --filter "Category=Performance" `
+          --logger "trx;LogFileName=performance_tests.trx" `
+          --logger "console;verbosity=normal"
+
+    - name: Generate performance report
+      run: |
+        Write-Host "Generating performance test report..."
+        $perfResults = Get-ChildItem -Path "**/TestResults/performance_tests.trx" -Recurse
+        if ($perfResults) {
+          Write-Host "Performance test results found:"
+          $perfResults | ForEach-Object { Write-Host "  - $($_.FullName)" }
+        } else {
+          Write-Host "No performance test results found"
+        }
+
+    - name: Upload performance test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: PerformanceTestResults-${{ github.run_number }}
+        path: |
+          **/TestResults/performance_tests.trx
+        retention-days: 30
+
+  security-tests:
+    name: Security Tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install security tools
+      run: |
+        Write-Host "Installing security testing tools..."
+        dotnet tool install --global dotnet-security-scan
+        dotnet tool install --global dotnet-outdated-tool
+
+    - name: Run security tests
+      run: |
+        dotnet test ${{ env.SOLUTION_FILE }} --configuration Release --no-build --verbosity normal `
+          --filter "Category=Security" `
+          --logger "trx;LogFileName=security_tests.trx" `
+          --logger "console;verbosity=normal"
+
+    - name: Security vulnerability scan
+      run: |
+        Write-Host "Running security vulnerability scan..."
+        dotnet list package --vulnerable
+        Write-Host "Security scan completed"
+
+    - name: Dependency security check
+      run: |
+        Write-Host "Checking dependency security..."
+        dotnet outdated --fail-on-updates
+        Write-Host "Dependency security check completed"
+
+    - name: Upload security test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: SecurityTestResults-${{ github.run_number }}
+        path: |
+          **/TestResults/security_tests.trx
+        retention-days: 30
+
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, performance-tests, security-tests]
+    if: always()
+    
+    steps:
+    - name: Generate test summary
+      run: |
+        echo "## 🧪 MedicalLabAnalyzer Test Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "- **Unit Tests**: ${{ needs.unit-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Integration Tests**: ${{ needs.integration-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Performance Tests**: ${{ needs.performance-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Security Tests**: ${{ needs.security-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Test Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- Unit Test Results: Available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- Integration Test Results: Available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- Performance Test Results: Available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- Security Test Results: Available in workflow artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+        echo "- **Workflow Run**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "*Generated by MedicalLabAnalyzer Advanced Testing Pipeline*" >> $GITHUB_STEP_SUMMARY
+
+    - name: Notify test completion
+      if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+      uses: slackapi/slack-github-action@v1.25.0
+      with:
+        payload: |
+          {
+            "text": "🧪 Advanced Testing completed for MedicalLabAnalyzer",
+            "attachments": [
+              {
+                "color": "${{ needs.unit-tests.result == 'success' && needs.integration-tests.result == 'success' && needs.performance-tests.result == 'success' && needs.security-tests.result == 'success' && 'good' || 'danger' }}",
+                "fields": [
+                  {"title": "Unit Tests", "value": "${{ needs.unit-tests.result }}", "short": true},
+                  {"title": "Integration Tests", "value": "${{ needs.integration-tests.result }}", "short": true},
+                  {"title": "Performance Tests", "value": "${{ needs.performance-tests.result }}", "short": true},
+                  {"title": "Security Tests", "value": "${{ needs.security-tests.result }}", "short": true},
+                  {"title": "Branch", "value": "${{ github.ref_name }}", "short": true},
+                  {"title": "Run Number", "value": "${{ github.run_number }}", "short": true}
+                ],
+                "footer": "MedicalLabAnalyzer Advanced Testing"
+              }
+            ]
+          }
