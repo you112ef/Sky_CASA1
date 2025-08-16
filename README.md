@@ -1,4 +1,4 @@
-# MedicalLabAnalyzer - Advanced Medical Laboratory Management System
+# MedicalLabAnalyzer - نظام إدارة المختبرات الطبية المتقدم
 
 ## 🏥 نظرة عامة
 
