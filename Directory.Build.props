@@ -70,6 +70,19 @@
     <!-- Conditional compilation symbols -->
     <DefineConstants Condition="'$(Configuration)' == 'Debug'">DEBUG;TRACE</DefineConstants>
     <DefineConstants Condition="'$(Configuration)' == 'Release'">RELEASE;TRACE</DefineConstants>
+    
+    <!-- NuGet package management -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="$(ContinuousIntegrationBuild) == 'true'">true</RestoreLockedMode>
+    
+    <!-- Build performance -->
+    <BuildInParallel>true</BuildInParallel>
+    <MaxCpuCount>0</MaxCpuCount>
+    
+    <!-- EmguCV specific settings -->
+    <EmguCVLinkTarget>x64</EmguCVLinkTarget>
+    <EmguCVNativeFileSkip>false</EmguCVNativeFileSkip>
+    <EmguCVErrorOnMissingRuntime>true</EmguCVErrorOnMissingRuntime>
   </PropertyGroup>
   
   <!-- Common package references for all projects -->
@@ -119,5 +132,48 @@
     <MakeDir Directories="$(OutputPath)logs" />
     <MakeDir Directories="$(OutputPath)VideoAnalysis" />
     <MakeDir Directories="$(OutputPath)Reports" />
+  </Target>
+  
+  <!-- Validate build prerequisites -->
+  <Target Name="ValidateBuildPrerequisites" BeforeTargets="Restore">
+    <Message Text="Validating build prerequisites..." Importance="high" />
+    
+    <!-- Check .NET version -->
+    <Exec Command="dotnet --version" ContinueOnError="false" />
+    
+    <!-- Check NuGet configuration -->
+    <Message Text="NuGet configuration validated" Importance="normal" />
+  </Target>
+  
+  <!-- Post-restore validation -->
+  <Target Name="PostRestoreValidation" AfterTargets="Restore">
+    <Message Text="Validating package restore..." Importance="high" />
+    
+    <!-- Check if project.assets.json exists -->
+    <ItemGroup>
+      <ProjectAssets Include="$(MSBuildProjectDirectory)\obj\project.assets.json" />
+    </ItemGroup>
+    
+    <Message Text="Found @(ProjectAssets->Count()) project assets files" Importance="normal" />
+    
+    <!-- Validate EmguCV dependencies if this is the main project -->
+    <CallTarget Targets="ValidateEmguCVDependencies" 
+                Condition="$(MSBuildProjectName) == 'MedicalLabAnalyzer'" />
+  </Target>
+  
+  <!-- EmguCV dependency validation -->
+  <Target Name="ValidateEmguCVDependencies" Condition="$(MSBuildProjectName) == 'MedicalLabAnalyzer'">
+    <Message Text="Validating EmguCV dependencies..." Importance="high" />
+    
+    <ItemGroup>
+      <EmguCVRuntimeFiles Include="$(NuGetPackageRoot)emgu.cv.runtime.windows\**\runtimes\win-x64\**\*.dll" />
+      <EmguCVRuntimeFiles Include="$(NuGetPackageRoot)emgu.cv.runtime.windows.msvc.rt.x64\**\runtimes\win-x64\**\*.dll" />
+    </ItemGroup>
+    
+    <Message Text="Found @(EmguCVRuntimeFiles->Count()) EmguCV runtime files" Importance="normal" />
+    
+    <!-- Warning if no EmguCV files found -->
+    <Warning Text="No EmguCV runtime files found. Video analysis may not work correctly." 
+             Condition="@(EmguCVRuntimeFiles->Count()) == 0" />
   </Target>
 </Project>

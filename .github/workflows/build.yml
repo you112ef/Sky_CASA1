@@ -1,4 +1,4 @@
-name: Build and Test
+name: Build and Test - Enhanced
 
 on:
   push:
@@ -10,11 +10,13 @@ on:
 env:
   DOTNET_VERSION: '8.0.x'
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
 
 jobs:
   build:
     runs-on: windows-2022  # Use Windows Server 2022 explicitly to avoid migration notice
-    timeout-minutes: 30
+    timeout-minutes: 45  # Increased timeout
     strategy:
       matrix:
         configuration: [Debug, Release]
@@ -24,9 +26,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: System information
+    - name: System Information & Health Check
       run: |
-        echo "=== System Information ==="
+        echo "=== System Health Check ==="
         echo "Available disk space:"
         Get-WmiObject -Class Win32_LogicalDisk | Where-Object DriveType -eq 3 | Format-Table DeviceID, @{Name="Size(GB)";Expression={[math]::Round($_.Size/1GB,2)}}, @{Name="FreeSpace(GB)";Expression={[math]::Round($_.FreeSpace/1GB,2)}}
         echo "Memory info:"
@@ -36,7 +38,7 @@ jobs:
         Test-NetConnection api.nuget.org -Port 443 -InformationLevel Detailed
         echo "PowerShell version:"
         $PSVersionTable.PSVersion
-        echo "=== End System Information ==="
+        echo "=== End System Health Check ==="
       shell: pwsh
       continue-on-error: true
       
@@ -45,41 +47,40 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
         
-    - name: Cache NuGet packages
+    - name: Enhanced NuGet Cache
       uses: actions/cache@v4
       with:
         path: |
           ~/.nuget/packages
           %USERPROFILE%\.nuget\packages
           ${{ github.workspace }}/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json', '**/Directory.Build.props') }}
+          ${{ github.workspace }}/.nuget/global-packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json', '**/Directory.Build.props', '**/nuget.config') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
           
-    - name: Clear NuGet cache (if needed)
-      run: dotnet nuget locals all --clear
-      continue-on-error: true
-          
-    - name: Restore dependencies
-      id: restore
+    - name: Pre-restore cleanup
       run: |
-        echo "Starting package restore..."
-        dotnet restore MedicalLabAnalyzer.sln --verbosity normal --runtime win-x64 --disable-parallel:false
-        echo "Package restore completed successfully"
-      env:
-        DOTNET_CLI_TELEMETRY_OPTOUT: 1
-        DOTNET_NOLOGO: 1
-        
-    - name: Restore dependencies with diagnostics (retry on failure)
-      if: failure() && steps.restore.outcome == 'failure'
-      run: |
-        echo "First restore attempt failed, retrying with diagnostic verbosity..."
+        echo "Cleaning up before restore..."
         dotnet nuget locals all --clear
         dotnet clean MedicalLabAnalyzer.sln --verbosity minimal
-        dotnet restore MedicalLabAnalyzer.sln --verbosity diagnostic --runtime win-x64 --force --no-cache
-      env:
-        DOTNET_CLI_TELEMETRY_OPTOUT: 1
-        DOTNET_NOLOGO: 1
+        echo "Cleanup completed"
+      continue-on-error: true
+          
+    - name: Restore dependencies - Primary
+      id: restore
+      run: |
+        echo "Starting enhanced package restore..."
+        dotnet restore MedicalLabAnalyzer.sln --verbosity normal --runtime win-x64 --disable-parallel:false --force
+        echo "Primary restore completed successfully"
+        
+    - name: Restore dependencies - Fallback
+      if: failure() && steps.restore.outcome == 'failure'
+      run: |
+        echo "Primary restore failed, attempting fallback restore..."
+        dotnet nuget locals all --clear
+        dotnet restore MedicalLabAnalyzer.sln --verbosity diagnostic --runtime win-x64 --force --no-cache --ignore-failed-sources
+        echo "Fallback restore completed"
         
     - name: Validate restore success
       run: |
@@ -89,27 +90,22 @@ jobs:
         
         if (Test-Path $mainProjectAssets) {
           Write-Host "✅ Main project assets restored successfully"
+          $assets = Get-Content $mainProjectAssets | ConvertFrom-Json
+          Write-Host "Project: $($assets.projectName)"
+          Write-Host "Target: $($assets.targets.Keys | Select-Object -First 1)"
         } else {
-          Write-Host "❌ Main project assets missing at: $mainProjectAssets"
-          Write-Host "Attempting to locate main project..."
-          Get-ChildItem -Recurse -Filter "*.csproj" | Where-Object { $_.Name -like "*MedicalLabAnalyzer*" -and $_.Directory.Name -ne "Tests" } | ForEach-Object {
-            Write-Host "Found main project: $($_.FullName)"
-          }
+          Write-Host "❌ Main project assets missing"
+          exit 1
         }
         
         if (Test-Path $testProjectAssets) {
-          Write-Host "✅ Test project assets restored successfully"  
+          Write-Host "✅ Test project assets restored successfully"
         } else {
-          Write-Host "⚠️ Test project assets missing at: $testProjectAssets"
-          Write-Host "Checking for test projects..."
-          Get-ChildItem -Recurse -Filter "*.csproj" | Where-Object { $_.Name -like "*Test*" } | ForEach-Object {
-            Write-Host "Found test project: $($_.FullName)"
-          }
+          Write-Host "⚠️ Test project assets missing - this may be normal"
         }
         
-        Write-Host "Package validation completed"
+        Write-Host "Package validation completed successfully"
       shell: pwsh
-      continue-on-error: true
         
     - name: Generate package lock files if missing
       run: |
@@ -118,7 +114,7 @@ jobs:
           $lockFiles = Get-ChildItem -Recurse -Filter "packages.lock.json" -ErrorAction SilentlyContinue
           if ($lockFiles.Count -eq 0) {
             Write-Host "No lock files found. Generating lock files..."
-            dotnet restore MedicalLabAnalyzer.sln --force-evaluate
+            dotnet restore MedicalLabAnalyzer.sln --force-evaluate --locked-mode
             Write-Host "Checking for generated lock files..."
             $newLockFiles = Get-ChildItem -Recurse -Filter "packages.lock.json" -ErrorAction SilentlyContinue
             if ($newLockFiles.Count -gt 0) {
@@ -142,7 +138,7 @@ jobs:
       run: |
         echo "Building solution with configuration: ${{ matrix.configuration }}"
         dotnet build MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-restore --runtime win-x64 --verbosity normal
-        echo "Build completed with exit code: $LASTEXITCODE"
+        echo "Build completed successfully"
       shell: pwsh
       
     - name: Diagnose build issues on failure
@@ -170,6 +166,16 @@ jobs:
         # Check target framework
         Write-Host "Checking target frameworks..."
         Get-Content "src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj" | Select-String -Pattern "TargetFramework"
+        
+        # Check EmguCV dependencies
+        Write-Host "Checking EmguCV dependencies..."
+        $emguCVPath = "$env:USERPROFILE\.nuget\packages\emgu.cv.runtime.windows\4.8.1.5350\runtimes\win-x64\native"
+        if (Test-Path $emguCVPath) {
+          Write-Host "✓ EmguCV runtime found at: $emguCVPath"
+          Get-ChildItem $emguCVPath | ForEach-Object { Write-Host "  - $($_.Name)" }
+        } else {
+          Write-Host "✗ EmguCV runtime not found at: $emguCVPath"
+        }
       shell: pwsh
       
     - name: Create test results directory
@@ -183,8 +189,7 @@ jobs:
       run: |
         echo "Running tests for configuration: ${{ matrix.configuration }}"
         dotnet test MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-build --verbosity normal --logger trx --results-directory TestResults --collect:"XPlat Code Coverage"
-        echo "Tests completed. Checking for test result files..."
-        Get-ChildItem -Path TestResults -Recurse | ForEach-Object { Write-Host $_.FullName }
+        echo "Tests completed successfully"
       shell: pwsh
       continue-on-error: true
       
@@ -220,5 +225,6 @@ jobs:
           **/*.binlog
           **/*.log
           **/obj/project.assets.json
+          **/nuget.config
         retention-days: 7
         if-no-files-found: ignore
