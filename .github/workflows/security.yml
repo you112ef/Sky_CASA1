@@ -1,0 +1,183 @@
+name: Security Scanning - MedicalLabAnalyzer
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '8.0.100'
+  SOLUTION_FILE: 'MedicalLabAnalyzer.sln'
+
+jobs:
+  security-scan:
+    name: Security Vulnerability Scan
+    runs-on: windows-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Clear NuGet cache
+      run: |
+        Write-Host "=== Clearing NuGet Cache ==="
+        dotnet nuget locals all --clear
+        Write-Host "✅ NuGet cache cleared"
+
+    - name: Restore packages
+      run: |
+        Write-Host "=== Restoring Packages ==="
+        dotnet restore "${{ env.SOLUTION_FILE }}" --verbosity normal
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Packages restored successfully"
+        } else {
+          Write-Host "❌ Package restore failed"
+          exit 1
+        }
+
+    - name: Build solution
+      run: |
+        Write-Host "=== Building Solution ==="
+        dotnet build "${{ env.SOLUTION_FILE }}" --configuration Release --no-restore --verbosity normal
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Solution built successfully"
+        } else {
+          Write-Host "❌ Build failed"
+          exit 1
+        }
+
+    - name: Check for vulnerable packages
+      run: |
+        Write-Host "=== Checking for Vulnerable Packages ==="
+        $vulnerableOutput = dotnet list package --vulnerable 2>&1
+        if ($LASTEXITCODE -eq 0) {
+          if ($vulnerableOutput -match "No vulnerable packages found") {
+            Write-Host "✅ No vulnerable packages found"
+          } else {
+            Write-Host "⚠️ Vulnerable packages found:"
+            Write-Host $vulnerableOutput
+          }
+        } else {
+          Write-Host "❌ Error checking vulnerable packages"
+          Write-Host $vulnerableOutput
+        }
+
+    - name: Check for outdated packages
+      run: |
+        Write-Host "=== Checking for Outdated Packages ==="
+        $outdatedOutput = dotnet list package --outdated 2>&1
+        if ($LASTEXITCODE -eq 0) {
+          if ($outdatedOutput -match "No packages were found") {
+            Write-Host "✅ All packages are up to date"
+          } else {
+            Write-Host "⚠️ Outdated packages found:"
+            Write-Host $outdatedOutput
+          }
+        } else {
+          Write-Host "❌ Error checking outdated packages"
+          Write-Host $outdatedOutput
+        }
+
+    - name: Analyze package dependencies
+      run: |
+        Write-Host "=== Analyzing Package Dependencies ==="
+        $dependencies = dotnet list package --format json | ConvertFrom-Json
+        $totalPackages = 0
+        $directPackages = 0
+        
+        if ($dependencies.packages) {
+          $totalPackages = $dependencies.packages.Count
+          $directPackages = ($dependencies.packages | Where-Object { $_.resolved -eq $null }).Count
+        }
+        
+        Write-Host "Total packages: $totalPackages"
+        Write-Host "Direct packages: $directPackages"
+        Write-Host "Transitive packages: $($totalPackages - $directPackages)"
+
+    - name: Check license compliance
+      run: |
+        Write-Host "=== Checking License Compliance ==="
+        $packages = dotnet list package --format json | ConvertFrom-Json
+        
+        if ($packages.packages) {
+          Write-Host "Package licenses:"
+          $packages.packages | ForEach-Object {
+            $license = if ($_.licenseUrl) { $_.licenseUrl } else { "Not specified" }
+            Write-Host "  - $($_.id) v$($_.resolved): $license"
+          }
+        } else {
+          Write-Host "No packages found"
+        }
+
+    - name: Security audit summary
+      run: |
+        Write-Host "=== Security Audit Summary ==="
+        Write-Host "✅ Security scan completed successfully"
+        Write-Host "Build Number: ${{ github.run_number }}"
+        Write-Host "Commit: ${{ github.sha }}"
+        Write-Host "Branch: ${{ github.ref_name }}"
+        
+        # Create security report
+        $report = @"
+# Security Scan Report - MedicalLabAnalyzer
+
+## Scan Details
+- **Build Number**: ${{ github.run_number }}
+- **Commit**: ${{ github.sha }}
+- **Branch**: ${{ github.ref_name }}
+- **Scan Date**: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+
+## Package Analysis
+- **Total Packages**: $totalPackages
+- **Direct Packages**: $directPackages
+- **Transitive Packages**: $($totalPackages - $directPackages)
+
+## Vulnerabilities
+- **Vulnerable Packages**: $($vulnerableOutput -match "No vulnerable packages found" ? "None" : "Found")
+- **Outdated Packages**: $($outdatedOutput -match "No packages were found" ? "None" : "Found")
+
+## Recommendations
+1. Update outdated packages regularly
+2. Monitor for security advisories
+3. Use dependency scanning tools
+4. Keep .NET SDK updated
+
+---
+*Generated by MedicalLabAnalyzer Security Scan*
+"@
+        
+        $report | Out-File -FilePath "security-report.md" -Encoding UTF8
+        Write-Host "✅ Security report generated: security-report.md"
+
+    - name: Upload security report
+      uses: actions/upload-artifact@v4
+      with:
+        name: SecurityReport-${{ github.run_number }}
+        path: security-report.md
+        retention-days: 30
+
+    - name: Create security summary
+      run: |
+        echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Scan Results" >> $GITHUB_STEP_SUMMARY
+        echo "- **Vulnerable Packages**: $($vulnerableOutput -match "No vulnerable packages found" ? "✅ None" : "⚠️ Found")" >> $GITHUB_STEP_SUMMARY
+        echo "- **Outdated Packages**: $($outdatedOutput -match "No packages were found" ? "✅ None" : "⚠️ Found")" >> $GITHUB_STEP_SUMMARY
+        echo "- **Total Packages**: $totalPackages" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 Recommendations" >> $GITHUB_STEP_SUMMARY
+        echo "1. Update outdated packages regularly" >> $GITHUB_STEP_SUMMARY
+        echo "2. Monitor for security advisories" >> $GITHUB_STEP_SUMMARY
+        echo "3. Use dependency scanning tools" >> $GITHUB_STEP_SUMMARY
+        echo "4. Keep .NET SDK updated" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "*Generated by MedicalLabAnalyzer Security Scan*" >> $GITHUB_STEP_SUMMARY

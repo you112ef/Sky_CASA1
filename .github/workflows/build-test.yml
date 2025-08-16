@@ -1,0 +1,190 @@
+name: Build and Test - MedicalLabAnalyzer
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '8.0.100'
+  SOLUTION_FILE: 'MedicalLabAnalyzer.sln'
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: windows-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install Chocolatey
+      run: |
+        Write-Host "=== Installing Chocolatey ==="
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        Write-Host "✅ Chocolatey installed successfully"
+
+    - name: Install VC++ Redistributables
+      run: |
+        Write-Host "=== Installing VC++ Redistributables ==="
+        choco install vcredist2019 -y --no-progress
+        choco install vcredist2022 -y --no-progress
+        Write-Host "✅ VC++ Redistributables installed successfully"
+
+    - name: Clear NuGet cache
+      run: |
+        Write-Host "=== Clearing NuGet Cache ==="
+        dotnet nuget locals all --clear
+        Write-Host "✅ NuGet cache cleared"
+
+    - name: Verify solution file
+      run: |
+        Write-Host "=== Verifying Solution File ==="
+        if (Test-Path "${{ env.SOLUTION_FILE }}") {
+          Write-Host "✅ Solution file found: ${{ env.SOLUTION_FILE }}"
+          Get-Content "${{ env.SOLUTION_FILE }}" | Select-Object -First 10
+        } else {
+          Write-Host "❌ Solution file not found: ${{ env.SOLUTION_FILE }}"
+          Write-Host "Available .sln files:"
+          Get-ChildItem -Name "*.sln"
+          exit 1
+        }
+
+    - name: Restore packages
+      run: |
+        Write-Host "=== Restoring Packages ==="
+        dotnet restore "${{ env.SOLUTION_FILE }}" --verbosity normal
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Packages restored successfully"
+        } else {
+          Write-Host "❌ Package restore failed"
+          exit 1
+        }
+
+    - name: Build solution
+      run: |
+        Write-Host "=== Building Solution ==="
+        dotnet build "${{ env.SOLUTION_FILE }}" --configuration Release --no-restore --verbosity normal
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Solution built successfully"
+        } else {
+          Write-Host "❌ Build failed"
+          exit 1
+        }
+
+    - name: Create TestResults directory
+      run: |
+        Write-Host "=== Creating TestResults Directory ==="
+        New-Item -ItemType Directory -Path "TestResults" -Force
+        Write-Host "✅ TestResults directory created"
+
+    - name: Run tests
+      run: |
+        Write-Host "=== Running Tests ==="
+        dotnet test "${{ env.SOLUTION_FILE }}" --configuration Release --no-build --verbosity normal `
+          --logger "trx;LogFileName=build_test_results.trx" `
+          --logger "console;verbosity=normal" `
+          --results-directory ./TestResults
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Tests completed successfully"
+        } else {
+          Write-Host "❌ Tests failed"
+          exit 1
+        }
+
+    - name: Check test results
+      run: |
+        Write-Host "=== Checking Test Results ==="
+        $testResults = Get-ChildItem -Path "TestResults/*.trx" -ErrorAction SilentlyContinue
+        if ($testResults) {
+          Write-Host "✅ Test results found:"
+          $testResults | ForEach-Object { Write-Host "  - $($_.Name)" }
+        } else {
+          Write-Host "⚠️ No test result files found"
+        }
+
+    - name: Check build artifacts
+      run: |
+        Write-Host "=== Checking Build Artifacts ==="
+        $binPath = "bin/Release/net8.0-windows"
+        if (Test-Path $binPath) {
+          $files = Get-ChildItem $binPath -Recurse -File | Measure-Object -Property Length -Sum
+          Write-Host "✅ Build artifacts found: $($files.Count) files, $([math]::Round($files.Sum / 1MB, 2)) MB"
+          
+          # List main executable files
+          $exeFiles = Get-ChildItem $binPath -Filter "*.exe" -Recurse
+          if ($exeFiles) {
+            Write-Host "Executable files:"
+            $exeFiles | ForEach-Object { Write-Host "  - $($_.Name)" }
+          }
+        } else {
+          Write-Host "⚠️ No build artifacts found in $binPath"
+          # Check other possible paths
+          $possiblePaths = @("bin/Release", "bin", "obj/Release")
+          foreach ($path in $possiblePaths) {
+            if (Test-Path $path) {
+              Write-Host "Found files in: $path"
+              Get-ChildItem $path -Recurse -File | Select-Object -First 5 | ForEach-Object { Write-Host "  - $($_.Name)" }
+            }
+          }
+        }
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: BuildTestResults-${{ github.run_number }}
+        path: TestResults/
+        retention-days: 30
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: BuildArtifacts-${{ github.run_number }}
+        path: |
+          bin/Release/net8.0-windows/
+          obj/Release/net8.0-windows/
+        retention-days: 30
+
+    - name: Create build summary
+      run: |
+        echo "## 🏗️ Build and Test Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ✅ Build Status" >> $GITHUB_STEP_SUMMARY
+        echo "- **Solution**: ${{ env.SOLUTION_FILE }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Configuration**: Release" >> $GITHUB_STEP_SUMMARY
+        echo "- **Target Framework**: .NET 8.0" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🧪 Test Status" >> $GITHUB_STEP_SUMMARY
+        echo "- **Test Results**: Available in artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status**: ✅ Success" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Artifacts**: Available in artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "- **Test Results**: Available in artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Links" >> $GITHUB_STEP_SUMMARY
+        echo "- **Workflow Run**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "*Generated by MedicalLabAnalyzer Build and Test Pipeline*" >> $GITHUB_STEP_SUMMARY
+
+    - name: Success summary
+      run: |
+        Write-Host "✅ Build and test completed successfully!"
+        Write-Host "Build Number: ${{ github.run_number }}"
+        Write-Host "Commit: ${{ github.sha }}"
+        Write-Host "Branch: ${{ github.ref_name }}"
+        Write-Host "Workflow: ${{ github.workflow }}"

@@ -1,0 +1,220 @@
+name: Package Creation - MedicalLabAnalyzer
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '8.0.100'
+  SOLUTION_FILE: 'MedicalLabAnalyzer.sln'
+  PROJECT_NAME: 'MedicalLabAnalyzer'
+
+jobs:
+  package-creation:
+    name: Create Offline Package
+    runs-on: windows-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Install Chocolatey
+      run: |
+        Write-Host "=== Installing Chocolatey ==="
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        Write-Host "✅ Chocolatey installed successfully"
+
+    - name: Install VC++ Redistributables
+      run: |
+        Write-Host "=== Installing VC++ Redistributables ==="
+        choco install vcredist2019 -y --no-progress
+        choco install vcredist2022 -y --no-progress
+        Write-Host "✅ VC++ Redistributables installed successfully"
+
+    - name: Clear NuGet cache
+      run: |
+        Write-Host "=== Clearing NuGet Cache ==="
+        dotnet nuget locals all --clear
+        Write-Host "✅ NuGet cache cleared"
+
+    - name: Restore packages
+      run: |
+        Write-Host "=== Restoring Packages ==="
+        dotnet restore "${{ env.SOLUTION_FILE }}" --verbosity normal
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Packages restored successfully"
+        } else {
+          Write-Host "❌ Package restore failed"
+          exit 1
+        }
+
+    - name: Build solution
+      run: |
+        Write-Host "=== Building Solution ==="
+        dotnet build "${{ env.SOLUTION_FILE }}" --configuration Release --no-restore --verbosity normal
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Solution built successfully"
+        } else {
+          Write-Host "❌ Build failed"
+          exit 1
+        }
+
+    - name: Create distribution folder
+      run: |
+        Write-Host "=== Creating Distribution Folder ==="
+        $DistFolder = "Dist/MedicalLabAnalyzer-v2.0.0"
+        New-Item -ItemType Directory -Path $DistFolder -Force
+        New-Item -ItemType Directory -Path "$DistFolder/App" -Force
+        New-Item -ItemType Directory -Path "$DistFolder/Database" -Force
+        New-Item -ItemType Directory -Path "$DistFolder/Reports" -Force
+        New-Item -ItemType Directory -Path "$DistFolder/Logs" -Force
+        Write-Host "✅ Distribution folder created: $DistFolder"
+
+    - name: Copy application files
+      run: |
+        Write-Host "=== Copying Application Files ==="
+        $SourcePath = "bin/Release/net8.0-windows"
+        $DestPath = "Dist/MedicalLabAnalyzer-v2.0.0/App"
+        
+        if (Test-Path $SourcePath) {
+          Copy-Item -Path "$SourcePath/*" -Destination $DestPath -Recurse -Force
+          Write-Host "✅ Application files copied successfully"
+        } else {
+          Write-Host "❌ Source path not found: $SourcePath"
+          exit 1
+        }
+
+    - name: Copy documentation files
+      run: |
+        Write-Host "=== Copying Documentation Files ==="
+        $DocFiles = @("README.md", "CHANGELOG.txt", "LICENSE", "INSTALLATION_GUIDE.md", "QUICK_START.md")
+        $DestPath = "Dist/MedicalLabAnalyzer-v2.0.0"
+        
+        foreach ($file in $DocFiles) {
+          if (Test-Path $file) {
+            Copy-Item -Path $file -Destination $DestPath -Force
+            Write-Host "✅ Copied: $file"
+          } else {
+            Write-Host "⚠️ File not found: $file"
+          }
+        }
+
+    - name: Create database template
+      run: |
+        Write-Host "=== Creating Database Template ==="
+        $DbPath = "Dist/MedicalLabAnalyzer-v2.0.0/Database"
+        New-Item -ItemType Directory -Path $DbPath -Force
+        
+        # Create empty database file
+        $DbFile = "$DbPath/medical_lab.db"
+        if (-not (Test-Path $DbFile)) {
+          New-Item -ItemType File -Path $DbFile -Force
+          Write-Host "✅ Database template created: $DbFile"
+        }
+
+    - name: Create configuration files
+      run: |
+        Write-Host "=== Creating Configuration Files ==="
+        $ConfigPath = "Dist/MedicalLabAnalyzer-v2.0.0/App"
+        
+        # Create appsettings.json if it doesn't exist
+        $AppSettings = @"
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=../Database/medical_lab.db"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning"
+    }
+  },
+  "Reports": {
+    "OutputPath": "../Reports",
+    "ArchivePath": "../Reports/Archive"
+  },
+  "Security": {
+    "SessionTimeout": 30,
+    "MaxLoginAttempts": 3
+  }
+}
+"@
+        
+        $AppSettings | Out-File -FilePath "$ConfigPath/appsettings.json" -Encoding UTF8
+        Write-Host "✅ Configuration files created"
+
+    - name: Create installation script
+      run: |
+        Write-Host "=== Creating Installation Script ==="
+        $InstallScript = @"
+@echo off
+echo Installing MedicalLabAnalyzer v2.0.0...
+echo.
+
+REM Check if .NET 8.0 is installed
+dotnet --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Error: .NET 8.0 is not installed.
+    echo Please install .NET 8.0 from: https://dotnet.microsoft.com/download/dotnet/8.0
+    pause
+    exit /b 1
+)
+
+REM Create desktop shortcut
+echo Creating desktop shortcut...
+powershell -Command "`$WshShell = New-Object -comObject WScript.Shell; `$Shortcut = `$WshShell.CreateShortcut(`"`$env:USERPROFILE\Desktop\MedicalLabAnalyzer.lnk`"); `$Shortcut.TargetPath = `"%~dp0App\MedicalLabAnalyzer.exe`"; `$Shortcut.Save()"
+
+echo.
+echo Installation completed successfully!
+echo You can now run MedicalLabAnalyzer from the desktop shortcut.
+pause
+"@
+        
+        $InstallScript | Out-File -FilePath "Dist/MedicalLabAnalyzer-v2.0.0/install.bat" -Encoding ASCII
+        Write-Host "✅ Installation script created"
+
+    - name: Create ZIP package
+      run: |
+        Write-Host "=== Creating ZIP Package ==="
+        $DistFolder = "Dist/MedicalLabAnalyzer-v2.0.0"
+        $ZipFile = "Dist/MedicalLabAnalyzer-v2.0.0.zip"
+        
+        if (Test-Path $ZipFile) {
+          Remove-Item $ZipFile -Force
+        }
+        
+        Compress-Archive -Path $DistFolder -DestinationPath $ZipFile -Force
+        Write-Host "✅ ZIP package created: $ZipFile"
+        
+        $ZipSize = (Get-Item $ZipFile).Length
+        Write-Host "Package size: $([math]::Round($ZipSize / 1MB, 2)) MB"
+
+    - name: Upload package artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: MedicalLabAnalyzer-Package-v2.0.0
+        path: |
+          Dist/MedicalLabAnalyzer-v2.0.0.zip
+          Dist/MedicalLabAnalyzer-v2.0.0/
+        retention-days: 90
+
+    - name: Success summary
+      run: |
+        Write-Host "✅ Package creation completed successfully!"
+        Write-Host "Build Number: ${{ github.run_number }}"
+        Write-Host "Commit: ${{ github.sha }}"
+        Write-Host "Branch: ${{ github.ref_name }}"
+        Write-Host "Package: MedicalLabAnalyzer-v2.0.0.zip"
+        Write-Host "Package Location: Dist/MedicalLabAnalyzer-v2.0.0.zip"

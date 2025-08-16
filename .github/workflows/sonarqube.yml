@@ -1,0 +1,147 @@
+name: SonarQube Analysis - MedicalLabAnalyzer
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '8.0.100'
+  SOLUTION_FILE: 'MedicalLabAnalyzer.sln'
+  SONAR_ORGANIZATION: 'my-org'
+  SONAR_PROJECT_KEY: 'medical-analyzer'
+
+jobs:
+  sonarqube-analysis:
+    name: SonarQube Analysis
+    runs-on: windows-latest
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Clear NuGet cache
+      run: |
+        Write-Host "=== Clearing NuGet Cache ==="
+        dotnet nuget locals all --clear
+        Write-Host "✅ NuGet cache cleared"
+
+    - name: Restore packages
+      run: |
+        Write-Host "=== Restoring Packages ==="
+        dotnet restore "${{ env.SOLUTION_FILE }}" --verbosity normal
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Packages restored successfully"
+        } else {
+          Write-Host "❌ Package restore failed"
+          exit 1
+        }
+
+    - name: Build solution
+      run: |
+        Write-Host "=== Building Solution ==="
+        dotnet build "${{ env.SOLUTION_FILE }}" --configuration Release --no-restore --verbosity normal
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Solution built successfully"
+        } else {
+          Write-Host "❌ Build failed"
+          exit 1
+        }
+
+    - name: Create TestResults directory
+      run: |
+        Write-Host "=== Creating TestResults Directory ==="
+        New-Item -ItemType Directory -Path "TestResults" -Force
+        Write-Host "✅ TestResults directory created"
+
+    - name: Run tests with coverage
+      run: |
+        Write-Host "=== Running Tests with Coverage ==="
+        dotnet test "${{ env.SOLUTION_FILE }}" --configuration Release --no-build --verbosity normal `
+          --logger "trx;LogFileName=sonarqube_tests.trx" `
+          --logger "console;verbosity=normal" `
+          /p:CollectCoverage=true `
+          /p:CoverletOutputFormat=cobertura `
+          /p:CoverletOutput=./TestResults/coverage.cobertura.xml `
+          /p:Threshold=80 `
+          /p:ThresholdType=line `
+          /p:ThresholdStat=total
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Tests with coverage completed successfully"
+        } else {
+          Write-Host "❌ Tests failed"
+          exit 1
+        }
+
+    - name: Install SonarCloud scanner
+      run: |
+        Write-Host "=== Installing SonarCloud Scanner ==="
+        dotnet tool install --global dotnet-sonarscanner
+        Write-Host "✅ SonarCloud scanner installed"
+
+    - name: Begin SonarQube analysis
+      run: |
+        Write-Host "=== Beginning SonarQube Analysis ==="
+        dotnet sonarscanner begin /k:"${{ env.SONAR_ORGANIZATION }}:${{ env.SONAR_PROJECT_KEY }}" `
+          /d:sonar.host.url="https://sonarcloud.io" `
+          /d:sonar.login="${{ secrets.SONAR_TOKEN }}" `
+          /d:sonar.organization="${{ env.SONAR_ORGANIZATION }}" `
+          /d:sonar.projectName="MedicalLabAnalyzer" `
+          /d:sonar.projectVersion="2.0.0" `
+          /d:sonar.sources="src" `
+          /d:sonar.tests="tests" `
+          /d:sonar.cs.vstest.reportsPaths="**/*.trx" `
+          /d:sonar.cs.opencover.reportsPaths="**/coverage.cobertura.xml" `
+          /d:sonar.coverage.exclusions="**/*Tests.cs,**/*Test.cs,**/*Spec.cs,**/Program.cs,**/Startup.cs" `
+          /d:sonar.exclusions="**/bin/**,**/obj/**,**/packages/**,**/node_modules/**,**/coverage/**,**/TestResults/**,**/Dist/**,**/Reports/**,**/Database/**"
+        Write-Host "✅ SonarQube analysis begun"
+
+    - name: Build with SonarQube
+      run: |
+        Write-Host "=== Building with SonarQube ==="
+        dotnet build "${{ env.SOLUTION_FILE }}" --configuration Release --no-restore --verbosity normal
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ Build with SonarQube completed successfully"
+        } else {
+          Write-Host "❌ Build with SonarQube failed"
+          exit 1
+        }
+
+    - name: End SonarQube analysis
+      run: |
+        Write-Host "=== Ending SonarQube Analysis ==="
+        dotnet sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+        if ($LASTEXITCODE -eq 0) {
+          Write-Host "✅ SonarQube analysis completed successfully"
+        } else {
+          Write-Host "❌ SonarQube analysis failed"
+          exit 1
+        }
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      with:
+        name: SonarQubeTestResults-${{ github.run_number }}
+        path: |
+          TestResults/
+          **/*.trx
+          **/coverage.cobertura.xml
+        retention-days: 30
+
+    - name: Success summary
+      run: |
+        Write-Host "✅ SonarQube analysis completed successfully!"
+        Write-Host "Build Number: ${{ github.run_number }}"
+        Write-Host "Commit: ${{ github.sha }}"
+        Write-Host "Branch: ${{ github.ref_name }}"
+        Write-Host "SonarCloud Project: ${{ env.SONAR_ORGANIZATION }}/${{ env.SONAR_PROJECT_KEY }}"
