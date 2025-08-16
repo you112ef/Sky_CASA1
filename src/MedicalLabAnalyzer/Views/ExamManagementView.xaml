@@ -76,8 +76,7 @@
         <StackPanel Grid.Row="1" 
                     Orientation="Horizontal" 
                     Margin="0,0,0,20"
-                    Background="#F5F5F5"
-                    Padding="5">
+                    Background="#F5F5F5">
             
             <Button Content="تحليل CASA" 
                     Style="{StaticResource TabButtonStyle}"
