@@ -19,8 +19,12 @@ jobs:
       with:
         dotnet-version: '8.0.x'
         
+    - name: Clear NuGet cache
+      run: dotnet nuget locals all --clear
+      continue-on-error: true
+      
     - name: Restore dependencies
-      run: dotnet restore MedicalLabAnalyzer.sln
+      run: dotnet restore MedicalLabAnalyzer.sln --verbosity normal
       
     - name: Build solution
       run: dotnet build MedicalLabAnalyzer.sln --configuration Debug --no-restore --verbosity normal

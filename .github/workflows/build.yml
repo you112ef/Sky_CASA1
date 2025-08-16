@@ -31,13 +31,19 @@ jobs:
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        path: |
+          ~/.nuget/packages
+          %USERPROFILE%\.nuget\packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
           
+    - name: Clear NuGet cache (if needed)
+      run: dotnet nuget locals all --clear
+      continue-on-error: true
+          
     - name: Restore dependencies
-      run: dotnet restore MedicalLabAnalyzer.sln
+      run: dotnet restore MedicalLabAnalyzer.sln --verbosity normal
       
     - name: Build solution
       run: dotnet build MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-restore
