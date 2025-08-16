@@ -18,9 +18,8 @@ namespace MedicalLabAnalyzer.Views
             // Initialize auth service (in a real app, this would come from DI)
             _authService = new AuthService();
             
-            // Set default values for testing
-            UsernameTextBox.Text = "admin";
-            PasswordBox.Password = "admin123";
+            // Focus on username field for better UX
+            UsernameTextBox.Focus();
         }
 
         private void LoginButton_Click(object sender, RoutedEventArgs e)

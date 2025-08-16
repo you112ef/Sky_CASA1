@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using MedicalLabAnalyzer.Models;
 using MedicalLabAnalyzer.Services;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
+using System.Linq;
 
 namespace MedicalLabAnalyzer.ViewModels
 {
@@ -24,11 +27,15 @@ namespace MedicalLabAnalyzer.ViewModels
         private int _urineExams;
         private int _stoolExams;
         
-        public DashboardViewModel()
+        public DashboardViewModel(IConfiguration configuration = null, ILogger<DashboardViewModel> logger = null)
         {
-            _patientService = new PatientService();
-            _userService = new UserService();
-            _auditLogger = new AuditLogger();
+            // إنشاء database connection factory
+            var connectionFactory = new DatabaseConnectionFactory(configuration, null);
+            var dbConnection = connectionFactory.CreateConnection();
+            
+            _patientService = new PatientService(null, dbConnection);
+            _userService = new UserService(null, dbConnection);
+            _auditLogger = new AuditLogger(null, dbConnection);
             
             RecentActivity = new ObservableCollection<ActivityItem>();
             RefreshCommand = new RelayCommand(async () => await LoadDashboardDataAsync());
@@ -126,40 +133,39 @@ namespace MedicalLabAnalyzer.ViewModels
             try
             {
                 // تحميل إحصائيات المرضى
-                var patientStats = await _patientService.GetPatientStatisticsAsync();
-                TotalPatients = patientStats.TotalPatients;
+                var allPatients = await _patientService.GetAllPatientsAsync();
+                TotalPatients = allPatients?.Count ?? 0;
                 
-                // تحميل إحصائيات الفحوصات
-                var examStats = await _patientService.GetExamStatisticsAsync();
-                TotalExams = examStats.TotalExams;
-                TodayExams = examStats.TodayExams;
-                PendingResults = examStats.PendingResults;
+                // إحصائيات مؤقتة - يمكن تطويرها لاحقاً
+                TotalExams = 0;
+                TodayExams = 0;
+                PendingResults = 0;
                 
-                // تحميل إحصائيات أنواع التحاليل
-                CASAExams = examStats.CASAExams;
-                CBCExams = examStats.CBCExams;
-                UrineExams = examStats.UrineExams;
-                StoolExams = examStats.StoolExams;
+                // إحصائيات أنواع التحاليل - مؤقتة
+                CASAExams = 0;
+                CBCExams = 0;
+                UrineExams = 0;
+                StoolExams = 0;
                 
                 // تحميل النشاط الأخير
                 await LoadRecentActivityAsync();
                 
                 // تسجيل الوصول للوحة التحكم
-                await _auditLogger.LogAsync(
-                    EventType.DashboardAccess,
-                    "تم الوصول للوحة التحكم الرئيسية",
+                await _auditLogger.LogUserActionAsync(
+                    "system",
                     "System",
-                    0
+                    "DashboardAccess",
+                    "تم الوصول للوحة التحكم الرئيسية"
                 );
             }
             catch (Exception ex)
             {
                 // تسجيل الخطأ
-                await _auditLogger.LogAsync(
-                    EventType.SystemError,
-                    $"خطأ في تحميل بيانات لوحة التحكم: {ex.Message}",
+                await _auditLogger.LogSystemEventAsync(
+                    "system",
                     "System",
-                    0
+                    "SystemError",
+                    $"خطأ في تحميل بيانات لوحة التحكم: {ex.Message}"
                 );
             }
         }
@@ -171,15 +177,18 @@ namespace MedicalLabAnalyzer.ViewModels
                 RecentActivity.Clear();
                 
                 // الحصول على آخر 10 أنشطة من AuditLog
-                var recentLogs = await _auditLogger.GetRecentLogsAsync(10);
+                var recentLogs = await _auditLogger.GetAuditLogsAsync();
                 
-                foreach (var log in recentLogs)
+                if (recentLogs != null)
                 {
-                    RecentActivity.Add(new ActivityItem
+                    foreach (var log in recentLogs.Take(10))
                     {
-                        Description = log.Description,
-                        Timestamp = log.Timestamp
-                    });
+                        RecentActivity.Add(new ActivityItem
+                        {
+                            Description = log.Action + ": " + log.Details,
+                            Timestamp = log.Timestamp
+                        });
+                    }
                 }
             }
             catch (Exception ex)

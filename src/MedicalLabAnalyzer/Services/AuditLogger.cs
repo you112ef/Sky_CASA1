@@ -2,16 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using System.Data;
+using Dapper;
+using System.Linq;
 
 namespace MedicalLabAnalyzer.Services
 {
     public class AuditLogger
     {
         private readonly ILogger<AuditLogger> _logger;
+        private readonly IDbConnection _db;
 
-        public AuditLogger(ILogger<AuditLogger> logger = null)
+        public AuditLogger(ILogger<AuditLogger> logger = null, IDbConnection dbConnection = null)
         {
             _logger = logger;
+            _db = dbConnection;
         }
 
         public async Task<bool> LogUserActionAsync(string userId, string userName, string action, string details)
@@ -181,6 +186,19 @@ namespace MedicalLabAnalyzer.Services
                 throw;
             }
         }
+    }
+
+    public class AuditLog
+    {
+        public int Id { get; set; }
+        public string UserId { get; set; }
+        public string UserName { get; set; }
+        public string Action { get; set; }
+        public string Details { get; set; }
+        public DateTime Timestamp { get; set; }
+        public string LogType { get; set; }
+        public string IpAddress { get; set; }
+        public string UserAgent { get; set; }
     }
 
     public class AuditLogEntry

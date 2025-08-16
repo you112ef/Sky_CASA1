@@ -320,10 +320,121 @@ namespace MedicalLabAnalyzer.Services
 
         private double EstimateMotility(Image<Bgr, byte> image)
         {
-            // تقدير الحركة باستخدام تحليل الفرق بين الإطارات
-            // هذا مثال مبسط - في التطبيق الحقيقي نحتاج إلى فيديو
-            var random = new Random();
-            return random.NextDouble() * 100; // قيمة عشوائية للتوضيح
+            // تقدير الحركة باستخدام تحليل البكسلات والكثافة
+            // في حالة عدم توفر فيديو، نقدر الحركة من الصورة الثابتة
+            
+            try
+            {
+                using var gray = image.Convert<Gray, byte>();
+                using var blur = new Image<Gray, byte>(image.Size);
+                CvInvoke.GaussianBlur(gray, blur, new Size(5, 5), 0);
+                
+                using var edges = new Image<Gray, byte>(image.Size);
+                CvInvoke.Canny(blur, edges, 50, 150);
+                
+                // حساب كثافة الحواف كمؤشر للحركة المحتملة
+                var edgePixels = CvInvoke.CountNonZero(edges);
+                var totalPixels = image.Width * image.Height;
+                var edgeDensity = (double)edgePixels / totalPixels;
+                
+                // تحليل التوزيع المكاني للحيوانات المنوية
+                var spermDistribution = AnalyzeSpermDistribution(image);
+                
+                // تقدير الحركة بناءً على التوزيع والكثافة
+                var motilityScore = CalculateMotilityFromStaticImage(edgeDensity, spermDistribution);
+                
+                return Math.Min(100, Math.Max(0, motilityScore));
+            }
+            catch (Exception)
+            {
+                // في حالة فشل التحليل، العودة لقيمة افتراضية منخفضة
+                return 0;
+            }
+        }
+        
+        private Dictionary<string, double> AnalyzeSpermDistribution(Image<Bgr, byte> image)
+        {
+            var distribution = new Dictionary<string, double>();
+            
+            using var hsv = image.Convert<Hsv, byte>();
+            using var mask = new Image<Gray, byte>(image.Size);
+            
+            // إنشاء قناع للحيوانات المنوية
+            var lower = new Hsv(0, 0, 200);
+            var upper = new Hsv(60, 30, 255);
+            CvInvoke.InRange(hsv, lower, upper, mask);
+            
+            using var contours = new VectorOfVectorOfPoint();
+            using var hierarchy = new Mat();
+            CvInvoke.FindContours(mask, contours, hierarchy, RetrType.External, ChainApproxMethod.ChainApproxSimple);
+            
+            var spermPositions = new List<PointF>();
+            
+            for (int i = 0; i < contours.Size; i++)
+            {
+                var area = CvInvoke.ContourArea(contours[i]);
+                if (area > 50 && area < 500)
+                {
+                    var moments = CvInvoke.Moments(contours[i]);
+                    if (moments.M00 > 0)
+                    {
+                        var centerX = (float)(moments.M10 / moments.M00);
+                        var centerY = (float)(moments.M01 / moments.M00);
+                        spermPositions.Add(new PointF(centerX, centerY));
+                    }
+                }
+            }
+            
+            distribution["Count"] = spermPositions.Count;
+            distribution["Density"] = spermPositions.Count / (image.Width * image.Height * 1e-6);
+            distribution["Clustering"] = CalculateClusteringIndex(spermPositions);
+            
+            return distribution;
+        }
+        
+        private double CalculateClusteringIndex(List<PointF> positions)
+        {
+            if (positions.Count < 2) return 0;
+            
+            var totalDistance = 0.0;
+            var pairCount = 0;
+            
+            for (int i = 0; i < positions.Count; i++)
+            {
+                for (int j = i + 1; j < positions.Count; j++)
+                {
+                    var dx = positions[i].X - positions[j].X;
+                    var dy = positions[i].Y - positions[j].Y;
+                    totalDistance += Math.Sqrt(dx * dx + dy * dy);
+                    pairCount++;
+                }
+            }
+            
+            var averageDistance = totalDistance / pairCount;
+            
+            // تحويل المسافة المتوسطة لمؤشر تجمع (0-100)
+            return Math.Min(100, Math.Max(0, 100 - (averageDistance / 10)));
+        }
+        
+        private double CalculateMotilityFromStaticImage(double edgeDensity, Dictionary<string, double> distribution)
+        {
+            var spermCount = distribution.GetValueOrDefault("Count", 0);
+            var clustering = distribution.GetValueOrDefault("Clustering", 0);
+            
+            if (spermCount == 0) return 0;
+            
+            // تقدير الحركة بناءً على:
+            // 1. كثافة الحواف (المزيد من الحواف = المزيد من الحركة)
+            // 2. عدد الحيوانات المنوية
+            // 3. مؤشر التجمع (أقل تجمع = حركة أكثر)
+            
+            var edgeScore = edgeDensity * 1000; // تحويل لنطاق 0-100
+            var countScore = Math.Min(50, spermCount * 2); // النتيجة من عدد الحيوانات المنوية
+            var movementScore = Math.Max(0, 50 - clustering); // أقل تجمع = حركة أكثر
+            
+            var totalMotility = (edgeScore * 0.4 + countScore * 0.3 + movementScore * 0.3);
+            
+            return Math.Min(100, Math.Max(0, totalMotility));
         }
 
         public async Task<bool> ProcessBatchImagesAsync(List<string> imagePaths, string analysisType)

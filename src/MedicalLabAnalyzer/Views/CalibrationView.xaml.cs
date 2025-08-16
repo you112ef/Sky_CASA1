@@ -38,9 +38,10 @@ namespace MedicalLabAnalyzer.Views
             }
             catch
             {
-                // Use default values if database not accessible
-                txtMicronsPerPixel.Text = "0.5";
-                txtFPS.Text = "25.0";
+                // Database not accessible - user must provide calibration values
+                // These are common medical microscopy standards but must be verified
+                txtMicronsPerPixel.Text = ""; // Force user to enter correct value
+                txtFPS.Text = ""; // Force user to enter correct value
             }
             
             txtUser.Text = Environment.UserName;
