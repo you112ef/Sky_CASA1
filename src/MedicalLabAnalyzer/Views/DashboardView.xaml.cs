@@ -3,12 +3,12 @@ using MedicalLabAnalyzer.ViewModels;
 
 namespace MedicalLabAnalyzer.Views
 {
-    public partial class ExamManagementView : UserControl
+    public partial class DashboardView : UserControl
     {
-        public ExamManagementView()
+        public DashboardView()
         {
             InitializeComponent();
-            DataContext = new ExamManagementViewModel();
+            DataContext = new DashboardViewModel();
         }
     }
 }

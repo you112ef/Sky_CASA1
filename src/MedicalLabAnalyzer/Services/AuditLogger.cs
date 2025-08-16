@@ -4,6 +4,7 @@ using System.Data;
 using System.Data.SQLite;
 using System.Text.Json;
 using Dapper;
+using Microsoft.Extensions.Logging;
 
 namespace MedicalLabAnalyzer.Services
 {

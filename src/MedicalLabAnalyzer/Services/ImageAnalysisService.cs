@@ -546,5 +546,62 @@ namespace MedicalLabAnalyzer.Services
             }
             _frameHistory.Clear();
         }
+        
+        /// <summary>
+        /// Count sperm in a single frame for WHO 2021 analysis
+        /// </summary>
+        /// <param name="frame">Video frame to analyze</param>
+        /// <returns>Estimated sperm count in the frame</returns>
+        public async Task<int> CountSpermInFrameAsync(Mat frame)
+        {
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    // Convert to grayscale
+                    using var gray = new Mat();
+                    CvInvoke.CvtColor(frame, gray, ColorConversion.Bgr2Gray);
+                    
+                    // Apply Gaussian blur to reduce noise
+                    using var blurred = new Mat();
+                    CvInvoke.GaussianBlur(gray, blurred, new System.Drawing.Size(5, 5), 1.2);
+                    
+                    // Apply threshold to get binary image
+                    using var threshold = new Mat();
+                    CvInvoke.Threshold(blurred, threshold, 0, 255, ThresholdType.Binary | ThresholdType.Otsu);
+                    
+                    // Morphological operations to clean up
+                    using var kernel = CvInvoke.GetStructuringElement(ElementShape.Ellipse, new System.Drawing.Size(3, 3), new System.Drawing.Point(-1, -1));
+                    using var morphed = new Mat();
+                    CvInvoke.MorphologyEx(threshold, morphed, MorphOp.Open, kernel, new System.Drawing.Point(-1, -1), 1, BorderType.Replicate, new MCvScalar());
+                    
+                    // Find contours
+                    using var contours = new VectorOfVectorOfPoint();
+                    using var hierarchy = new Mat();
+                    CvInvoke.FindContours(morphed, contours, hierarchy, RetrType.External, ChainApproxMethod.ChainApproxSimple);
+                    
+                    // Count valid sperm-like objects
+                    var spermCount = 0;
+                    for (int i = 0; i < contours.Size; i++)
+                    {
+                        var contour = contours[i];
+                        var area = CvInvoke.ContourArea(contour);
+                        
+                        // Filter by area (typical sperm head: 6-15 pixels)
+                        if (area >= _parameters.MinBlobAreaPx && area <= 30.0)
+                        {
+                            spermCount++;
+                        }
+                    }
+                    
+                    return spermCount;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Error counting sperm in frame");
+                    return 0;
+                }
+            });
+        }
     }
 }

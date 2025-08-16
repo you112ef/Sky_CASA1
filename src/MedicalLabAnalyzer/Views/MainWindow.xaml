@@ -152,7 +152,7 @@
             <!-- Content Header -->
             <materialDesign:Card Grid.Row="0" Margin="0,0,0,8" Padding="16"
                                 Background="{DynamicResource MaterialDesignSurface}"
-                                Elevation="1">
+                                materialDesign:ShadowAssist.ShadowDepth="Depth1">
                 <TextBlock x:Name="txtPageTitle" Text="Dashboard - لوحة التحكم" 
                            FontSize="20" FontWeight="Bold"/>
             </materialDesign:Card>
