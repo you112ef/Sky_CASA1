@@ -21,13 +21,10 @@ namespace MedicalLabAnalyzer.Services
             {
                 _logger?.LogInformation("Starting urine analysis for patient: {PatientId}", testData.PatientId);
                 
-                // Simulate analysis process
-                await Task.Delay(2000);
-                
-                // Analyze results
+                // تحليل النتائج
                 AnalyzeResults(testData);
                 
-                // Generate interpretation
+                // توليد التفسير
                 testData.Interpretation = GenerateInterpretation(testData);
                 
                 testData.AnalysisDate = DateTime.Now;

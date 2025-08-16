@@ -3,34 +3,44 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MedicalLabAnalyzer.Models;
+using System.Linq; // Added for .ToList()
+using Dapper; // Added for Dapper
+using System.Data; // Added for IDbConnection
 
 namespace MedicalLabAnalyzer.Services
 {
     public class PatientService
     {
         private readonly ILogger<PatientService> _logger;
+        private readonly IDbConnection _db; // Added for database connection
 
-        public PatientService(ILogger<PatientService> logger = null)
+        public PatientService(ILogger<PatientService> logger = null, IDbConnection db = null)
         {
             _logger = logger;
+            _db = db; // Initialize database connection
         }
 
-        public async Task<bool> CreatePatientAsync(Patient patient)
+        public async Task<Patient> CreatePatientAsync(Patient patient)
         {
             try
             {
-                _logger?.LogInformation("Creating patient: {FullName}", patient.FullName);
+                _logger?.LogInformation("Creating new patient: {FirstName} {LastName}", patient.FirstName, patient.LastName);
                 
-                // In a real application, this would save to database
-                await Task.Delay(100); // Simulate async operation
+                var sql = @"
+                    INSERT INTO Patients (FirstName, LastName, DateOfBirth, Gender, Phone, Email, Address, MedicalHistory, Allergies, EmergencyContact, EmergencyPhone, InsuranceProvider, InsuranceNumber, CreatedAt, UpdatedAt)
+                    VALUES (@FirstName, @LastName, @DateOfBirth, @Gender, @Phone, @Email, @Address, @MedicalHistory, @Allergies, @EmergencyContact, @EmergencyPhone, @InsuranceProvider, @InsuranceNumber, @CreatedAt, @UpdatedAt);
+                    SELECT last_insert_rowid();";
                 
-                _logger?.LogInformation("Patient created successfully: {FullName}", patient.FullName);
-                return true;
+                var patientId = await _db.QuerySingleAsync<int>(sql, patient);
+                patient.Id = patientId;
+                
+                _logger?.LogInformation("Patient created successfully with ID: {PatientId}", patientId);
+                return patient;
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error creating patient: {FullName}", patient.FullName);
-                return false;
+                _logger?.LogError(ex, "Error creating patient: {FirstName} {LastName}", patient.FirstName, patient.LastName);
+                throw;
             }
         }
 
@@ -38,18 +48,36 @@ namespace MedicalLabAnalyzer.Services
         {
             try
             {
-                _logger?.LogInformation("Updating patient: {FullName}", patient.FullName);
+                _logger?.LogInformation("Updating patient: {PatientId}", patient.Id);
                 
-                // In a real application, this would update database
-                await Task.Delay(100); // Simulate async operation
+                var sql = @"
+                    UPDATE Patients 
+                    SET FirstName = @FirstName, LastName = @LastName, DateOfBirth = @DateOfBirth, 
+                        Gender = @Gender, Phone = @Phone, Email = @Email, Address = @Address, 
+                        MedicalHistory = @MedicalHistory, Allergies = @Allergies, 
+                        EmergencyContact = @EmergencyContact, EmergencyPhone = @EmergencyPhone, 
+                        InsuranceProvider = @InsuranceProvider, InsuranceNumber = @InsuranceNumber, 
+                        UpdatedAt = @UpdatedAt
+                    WHERE Id = @Id";
                 
-                _logger?.LogInformation("Patient updated successfully: {FullName}", patient.FullName);
-                return true;
+                var rowsAffected = await _db.ExecuteAsync(sql, patient);
+                var success = rowsAffected > 0;
+                
+                if (success)
+                {
+                    _logger?.LogInformation("Patient updated successfully: {PatientId}", patient.Id);
+                }
+                else
+                {
+                    _logger?.LogWarning("No patient found to update: {PatientId}", patient.Id);
+                }
+                
+                return success;
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error updating patient: {FullName}", patient.FullName);
-                return false;
+                _logger?.LogError(ex, "Error updating patient: {PatientId}", patient.Id);
+                throw;
             }
         }
 
@@ -59,16 +87,25 @@ namespace MedicalLabAnalyzer.Services
             {
                 _logger?.LogInformation("Deleting patient: {PatientId}", patientId);
                 
-                // In a real application, this would delete from database
-                await Task.Delay(100); // Simulate async operation
+                var sql = "DELETE FROM Patients WHERE Id = @PatientId";
+                var rowsAffected = await _db.ExecuteAsync(sql, new { PatientId = patientId });
+                var success = rowsAffected > 0;
                 
-                _logger?.LogInformation("Patient deleted successfully: {PatientId}", patientId);
-                return true;
+                if (success)
+                {
+                    _logger?.LogInformation("Patient deleted successfully: {PatientId}", patientId);
+                }
+                else
+                {
+                    _logger?.LogWarning("No patient found to delete: {PatientId}", patientId);
+                }
+                
+                return success;
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error deleting patient: {PatientId}", patientId);
-                return false;
+                throw;
             }
         }
 
@@ -78,42 +115,16 @@ namespace MedicalLabAnalyzer.Services
             {
                 _logger?.LogInformation("Retrieving all patients");
                 
-                // In a real application, this would query database
-                await Task.Delay(100); // Simulate async operation
+                var sql = "SELECT * FROM Patients ORDER BY LastName, FirstName";
+                var patients = await _db.QueryAsync<Patient>(sql);
                 
-                var patients = new List<Patient>
-                {
-                    new Patient
-                    {
-                        Id = 1,
-                        FirstName = "أحمد",
-                        LastName = "محمد",
-                        NationalId = "1234567890",
-                        DateOfBirth = new DateTime(1985, 5, 15),
-                        Gender = "ذكر",
-                        PhoneNumber = "0501234567",
-                        Email = "ahmed@example.com"
-                    },
-                    new Patient
-                    {
-                        Id = 2,
-                        FirstName = "فاطمة",
-                        LastName = "علي",
-                        NationalId = "0987654321",
-                        DateOfBirth = new DateTime(1990, 8, 22),
-                        Gender = "أنثى",
-                        PhoneNumber = "0509876543",
-                        Email = "fatima@example.com"
-                    }
-                };
-                
-                _logger?.LogInformation("Retrieved {Count} patients", patients.Count);
-                return patients;
+                _logger?.LogInformation("Retrieved {Count} patients", patients.Count());
+                return patients.ToList();
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "Error retrieving patients");
-                return new List<Patient>();
+                _logger?.LogError(ex, "Error retrieving all patients");
+                throw;
             }
         }
 
@@ -121,30 +132,26 @@ namespace MedicalLabAnalyzer.Services
         {
             try
             {
-                _logger?.LogInformation("Retrieving patient: {PatientId}", patientId);
+                _logger?.LogInformation("Retrieving patient with ID: {PatientId}", patientId);
                 
-                // In a real application, this would query database
-                await Task.Delay(100); // Simulate async operation
+                var sql = "SELECT * FROM Patients WHERE Id = @PatientId";
+                var patient = await _db.QueryFirstOrDefaultAsync<Patient>(sql, new { PatientId = patientId });
                 
-                var patient = new Patient
+                if (patient != null)
                 {
-                    Id = patientId,
-                    FirstName = "مريض",
-                    LastName = "تجريبي",
-                    NationalId = "1234567890",
-                    DateOfBirth = new DateTime(1985, 5, 15),
-                    Gender = "ذكر",
-                    PhoneNumber = "0501234567",
-                    Email = "patient@example.com"
-                };
+                    _logger?.LogInformation("Patient retrieved successfully: {PatientId}", patientId);
+                }
+                else
+                {
+                    _logger?.LogWarning("Patient not found: {PatientId}", patientId);
+                }
                 
-                _logger?.LogInformation("Retrieved patient: {PatientId}", patientId);
                 return patient;
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error retrieving patient: {PatientId}", patientId);
-                return null;
+                throw;
             }
         }
 
@@ -154,34 +161,25 @@ namespace MedicalLabAnalyzer.Services
             {
                 _logger?.LogInformation("Searching patients with term: {SearchTerm}", searchTerm);
                 
-                // In a real application, this would search database
-                await Task.Delay(100); // Simulate async operation
+                var sql = @"
+                    SELECT * FROM Patients 
+                    WHERE FirstName LIKE @SearchPattern 
+                       OR LastName LIKE @SearchPattern 
+                       OR Phone LIKE @SearchPattern 
+                       OR Email LIKE @SearchPattern 
+                       OR InsuranceNumber LIKE @SearchPattern
+                    ORDER BY LastName, FirstName";
                 
-                var patients = new List<Patient>();
+                var searchPattern = $"%{searchTerm}%";
+                var patients = await _db.QueryAsync<Patient>(sql, new { SearchPattern = searchPattern });
                 
-                // Simulate search results
-                if (!string.IsNullOrEmpty(searchTerm))
-                {
-                    patients.Add(new Patient
-                    {
-                        Id = 1,
-                        FirstName = "أحمد",
-                        LastName = "محمد",
-                        NationalId = "1234567890",
-                        DateOfBirth = new DateTime(1985, 5, 15),
-                        Gender = "ذكر",
-                        PhoneNumber = "0501234567",
-                        Email = "ahmed@example.com"
-                    });
-                }
-                
-                _logger?.LogInformation("Found {Count} patients for search term: {SearchTerm}", patients.Count, searchTerm);
-                return patients;
+                _logger?.LogInformation("Found {Count} patients matching search term: {SearchTerm}", patients.Count(), searchTerm);
+                return patients.ToList();
             }
             catch (Exception ex)
             {
                 _logger?.LogError(ex, "Error searching patients with term: {SearchTerm}", searchTerm);
-                return new List<Patient>();
+                throw;
             }
         }
     }
