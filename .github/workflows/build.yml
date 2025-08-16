@@ -24,6 +24,22 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: System information
+      run: |
+        echo "=== System Information ==="
+        echo "Available disk space:"
+        Get-WmiObject -Class Win32_LogicalDisk | Where-Object DriveType -eq 3 | Format-Table DeviceID, @{Name="Size(GB)";Expression={[math]::Round($_.Size/1GB,2)}}, @{Name="FreeSpace(GB)";Expression={[math]::Round($_.FreeSpace/1GB,2)}}
+        echo "Memory info:"
+        $memory = Get-WmiObject -Class Win32_ComputerSystem
+        echo "Total Physical Memory: $([math]::Round($memory.TotalPhysicalMemory/1GB,2)) GB"
+        echo "Network connectivity test:"
+        Test-NetConnection api.nuget.org -Port 443 -InformationLevel Detailed
+        echo "PowerShell version:"
+        $PSVersionTable.PSVersion
+        echo "=== End System Information ==="
+      shell: pwsh
+      continue-on-error: true
+      
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -45,21 +61,53 @@ jobs:
       continue-on-error: true
           
     - name: Restore dependencies
+      id: restore
       run: |
+        echo "Starting package restore..."
         dotnet restore MedicalLabAnalyzer.sln --verbosity normal --runtime win-x64 --disable-parallel:false
+        echo "Package restore completed successfully"
       env:
         DOTNET_CLI_TELEMETRY_OPTOUT: 1
         DOTNET_NOLOGO: 1
+        
+    - name: Restore dependencies with diagnostics (retry on failure)
+      if: failure() && steps.restore.outcome == 'failure'
+      run: |
+        echo "First restore attempt failed, retrying with diagnostic verbosity..."
+        dotnet nuget locals all --clear
+        dotnet clean MedicalLabAnalyzer.sln --verbosity minimal
+        dotnet restore MedicalLabAnalyzer.sln --verbosity diagnostic --runtime win-x64 --force --no-cache
+      env:
+        DOTNET_CLI_TELEMETRY_OPTOUT: 1
+        DOTNET_NOLOGO: 1
+        
+    - name: Validate restore success
+      run: |
+        echo "Validating package restore..."
+        if (Test-Path "src/MedicalLabAnalyzer/obj/project.assets.json") {
+          echo "✅ Main project assets restored successfully"
+        } else {
+          echo "❌ Main project assets missing"
+          exit 1
+        }
+        if (Test-Path "tests/MedicalLabAnalyzer.Tests/obj/project.assets.json") {
+          echo "✅ Test project assets restored successfully"
+        } else {
+          echo "❌ Test project assets missing"
+          exit 1
+        }
+        echo "Package validation completed"
+      shell: pwsh
       
     - name: Build solution
-      run: dotnet build MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-restore --runtime win-x64
+      run: dotnet build MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-restore --runtime win-x64 --verbosity normal
       
     - name: Create test results directory
       run: New-Item -ItemType Directory -Path "TestResults" -Force
       shell: pwsh
       
     - name: Run tests
-      run: dotnet test MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-build --verbosity normal --logger trx --results-directory TestResults
+      run: dotnet test MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-build --verbosity normal --logger trx --results-directory TestResults --collect:"XPlat Code Coverage"
       
     - name: Upload build artifacts (Release only)
       if: matrix.configuration == 'Release'
@@ -78,4 +126,17 @@ jobs:
         path: |
           TestResults/**/*.trx
           TestResults/**/*.xml
+          TestResults/**/*.coverage
         retention-days: 7
+        
+    - name: Upload diagnostic logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: diagnostic-logs-${{ matrix.configuration }}-${{ github.sha }}
+        path: |
+          **/*.binlog
+          **/*.log
+          **/obj/project.assets.json
+        retention-days: 7
+        continue-on-error: true
