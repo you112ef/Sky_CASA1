@@ -50,19 +50,9 @@ namespace MedicalLabAnalyzer
                         services.AddScoped<ImageAnalysisService>();
                         services.AddScoped<ReportService>();
 
-                        // Register ViewModels
-                        services.AddTransient<MainViewModel>();
-                        services.AddTransient<PatientsViewModel>();
-                        services.AddTransient<ExamsViewModel>();
-                        services.AddTransient<VideoAnalysisViewModel>();
-                        services.AddTransient<ReportsViewModel>();
-
                         // Register Views
                         services.AddTransient<MainWindow>();
-                        services.AddTransient<PatientsView>();
-                        services.AddTransient<ExamsView>();
-                        services.AddTransient<VideoAnalysisView>();
-                        services.AddTransient<ReportsView>();
+                        services.AddTransient<CalibrationView>();
                     })
                     .Build();
 
