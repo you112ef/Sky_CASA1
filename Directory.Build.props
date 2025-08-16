@@ -72,8 +72,7 @@
     <DefineConstants Condition="'$(Configuration)' == 'Release'">RELEASE;TRACE</DefineConstants>
     
     <!-- NuGet package management -->
-    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-    <RestoreLockedMode Condition="$(ContinuousIntegrationBuild) == 'true'">true</RestoreLockedMode>
+    <!-- These properties are already defined in the main PropertyGroup above -->
     
     <!-- Build performance -->
     <BuildInParallel>true</BuildInParallel>
