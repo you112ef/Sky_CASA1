@@ -34,12 +34,55 @@ jobs:
         iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
         Write-Host "✅ Chocolatey installed"
 
-    - name: Install VC++ Redistributables
+    - name: Ensure VC++ Redistributable (2015-2022)
+      shell: pwsh
+      continue-on-error: true
       run: |
-        Write-Host "=== Installing VC++ Redistributables ==="
-        choco install vcredist2019 -y --no-progress
-        choco install vcredist2022 -y --no-progress
-        Write-Host "✅ VC++ Redistributables installed"
+        Write-Host "=== Ensuring VC++ Redistributable (2015-2022) x64 ==="
+        $vcKey = 'HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64'
+        $installed = $false
+
+        try {
+          $reg = Get-ItemProperty $vcKey -ErrorAction SilentlyContinue
+          if ($reg -and $reg.Installed -eq 1) {
+            Write-Host "Detected VC++ x64: Version $($reg.Version)"
+            $installed = $true
+          }
+        } catch { }
+
+        if (-not $installed) {
+          if (Get-Command choco -ErrorAction SilentlyContinue) {
+            Write-Host "Attempting install via Chocolatey: vcredist140"
+            choco install vcredist140 -y --no-progress
+          } else {
+            Write-Host "Chocolatey not available; skipping choco install"
+          }
+
+          $reg2 = Get-ItemProperty $vcKey -ErrorAction SilentlyContinue
+          if ($reg2 -and $reg2.Installed -eq 1) {
+            $installed = $true
+          }
+        }
+
+        if (-not $installed) {
+          $url = 'https://aka.ms/vs/17/release/vc_redist.x64.exe'
+          $out = Join-Path $env:RUNNER_TEMP 'vc_redist.x64.exe'
+          Write-Host "Downloading VC++ Redistributable from $url"
+          Invoke-WebRequest -Uri $url -OutFile $out -UseBasicParsing
+          Write-Host "Running installer..."
+          Start-Process -FilePath $out -ArgumentList '/install /quiet /norestart' -Wait -NoNewWindow
+
+          $reg3 = Get-ItemProperty $vcKey -ErrorAction SilentlyContinue
+          if ($reg3 -and $reg3.Installed -eq 1) {
+            $installed = $true
+          }
+        }
+
+        if ($installed) {
+          Write-Host "✅ VC++ Redistributable ensured"
+        } else {
+          Write-Host "⚠️ Unable to verify VC++ Redistributable installation; continuing"
+        }
 
     - name: Clear NuGet cache
       run: |
