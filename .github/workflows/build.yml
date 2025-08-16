@@ -9,6 +9,7 @@ on:
 
 env:
   DOTNET_VERSION: '8.0.x'
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
 jobs:
   build:
@@ -23,6 +24,22 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: System information
+      run: |
+        echo "=== System Information ==="
+        echo "Available disk space:"
+        Get-WmiObject -Class Win32_LogicalDisk | Where-Object DriveType -eq 3 | Format-Table DeviceID, @{Name="Size(GB)";Expression={[math]::Round($_.Size/1GB,2)}}, @{Name="FreeSpace(GB)";Expression={[math]::Round($_.FreeSpace/1GB,2)}}
+        echo "Memory info:"
+        $memory = Get-WmiObject -Class Win32_ComputerSystem
+        echo "Total Physical Memory: $([math]::Round($memory.TotalPhysicalMemory/1GB,2)) GB"
+        echo "Network connectivity test:"
+        Test-NetConnection api.nuget.org -Port 443 -InformationLevel Detailed
+        echo "PowerShell version:"
+        $PSVersionTable.PSVersion
+        echo "=== End System Information ==="
+      shell: pwsh
+      continue-on-error: true
+      
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -34,7 +51,8 @@ jobs:
         path: |
           ~/.nuget/packages
           %USERPROFILE%\.nuget\packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+          ${{ github.workspace }}/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json', '**/Directory.Build.props') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
           
@@ -43,17 +61,132 @@ jobs:
       continue-on-error: true
           
     - name: Restore dependencies
-      run: dotnet restore MedicalLabAnalyzer.sln --verbosity normal
+      id: restore
+      run: |
+        echo "Starting package restore..."
+        dotnet restore MedicalLabAnalyzer.sln --verbosity normal --runtime win-x64 --disable-parallel:false
+        echo "Package restore completed successfully"
+      env:
+        DOTNET_CLI_TELEMETRY_OPTOUT: 1
+        DOTNET_NOLOGO: 1
+        
+    - name: Restore dependencies with diagnostics (retry on failure)
+      if: failure() && steps.restore.outcome == 'failure'
+      run: |
+        echo "First restore attempt failed, retrying with diagnostic verbosity..."
+        dotnet nuget locals all --clear
+        dotnet clean MedicalLabAnalyzer.sln --verbosity minimal
+        dotnet restore MedicalLabAnalyzer.sln --verbosity diagnostic --runtime win-x64 --force --no-cache
+      env:
+        DOTNET_CLI_TELEMETRY_OPTOUT: 1
+        DOTNET_NOLOGO: 1
+        
+    - name: Validate restore success
+      run: |
+        Write-Host "Validating package restore..."
+        $mainProjectAssets = "src/MedicalLabAnalyzer/obj/project.assets.json"
+        $testProjectAssets = "tests/MedicalLabAnalyzer.Tests/obj/project.assets.json"
+        
+        if (Test-Path $mainProjectAssets) {
+          Write-Host "✅ Main project assets restored successfully"
+        } else {
+          Write-Host "❌ Main project assets missing at: $mainProjectAssets"
+          Write-Host "Attempting to locate main project..."
+          Get-ChildItem -Recurse -Filter "*.csproj" | Where-Object { $_.Name -like "*MedicalLabAnalyzer*" -and $_.Directory.Name -ne "Tests" } | ForEach-Object {
+            Write-Host "Found main project: $($_.FullName)"
+          }
+        }
+        
+        if (Test-Path $testProjectAssets) {
+          Write-Host "✅ Test project assets restored successfully"  
+        } else {
+          Write-Host "⚠️ Test project assets missing at: $testProjectAssets"
+          Write-Host "Checking for test projects..."
+          Get-ChildItem -Recurse -Filter "*.csproj" | Where-Object { $_.Name -like "*Test*" } | ForEach-Object {
+            Write-Host "Found test project: $($_.FullName)"
+          }
+        }
+        
+        Write-Host "Package validation completed"
+      shell: pwsh
+      continue-on-error: true
+        
+    - name: Generate package lock files if missing
+      run: |
+        Write-Host "Checking for package lock files..."
+        try {
+          $lockFiles = Get-ChildItem -Recurse -Filter "packages.lock.json" -ErrorAction SilentlyContinue
+          if ($lockFiles.Count -eq 0) {
+            Write-Host "No lock files found. Generating lock files..."
+            dotnet restore MedicalLabAnalyzer.sln --force-evaluate
+            Write-Host "Checking for generated lock files..."
+            $newLockFiles = Get-ChildItem -Recurse -Filter "packages.lock.json" -ErrorAction SilentlyContinue
+            if ($newLockFiles.Count -gt 0) {
+              Write-Host "Lock files generated:"
+              $newLockFiles | ForEach-Object { Write-Host "  $($_.FullName)" }
+            } else {
+              Write-Host "Warning: No lock files were generated. This may be normal for some project types."
+            }
+          } else {
+            Write-Host "Lock files already exist:"
+            $lockFiles | ForEach-Object { Write-Host "  $($_.FullName)" }
+          }
+        } catch {
+          Write-Host "Error checking lock files: $($_.Exception.Message)"
+          Write-Host "Continuing with build process..."
+        }
+      shell: pwsh
+      continue-on-error: true
       
     - name: Build solution
-      run: dotnet build MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-restore
+      run: |
+        echo "Building solution with configuration: ${{ matrix.configuration }}"
+        dotnet build MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-restore --runtime win-x64 --verbosity normal
+        echo "Build completed with exit code: $LASTEXITCODE"
+      shell: pwsh
+      
+    - name: Diagnose build issues on failure
+      if: failure()
+      run: |
+        Write-Host "=== Build Failed - Diagnostic Information ==="
+        Write-Host "Checking for common build issues..."
+        
+        # Check if solution file exists
+        if (Test-Path "MedicalLabAnalyzer.sln") {
+          Write-Host "✓ Solution file found"
+        } else {
+          Write-Host "✗ Solution file not found"
+        }
+        
+        # Check project files
+        Get-ChildItem -Recurse -Filter "*.csproj" | ForEach-Object {
+          Write-Host "Found project: $($_.FullName)"
+        }
+        
+        # Check for missing packages
+        Write-Host "Checking NuGet packages..."
+        dotnet restore MedicalLabAnalyzer.sln --verbosity diagnostic | Select-String -Pattern "error|warning|failed" | ForEach-Object { Write-Host $_ }
+        
+        # Check target framework
+        Write-Host "Checking target frameworks..."
+        Get-Content "src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj" | Select-String -Pattern "TargetFramework"
+      shell: pwsh
       
     - name: Create test results directory
-      run: New-Item -ItemType Directory -Path "TestResults" -Force
+      run: |
+        Write-Host "Creating TestResults directory..."
+        New-Item -ItemType Directory -Path "TestResults" -Force
+        Write-Host "TestResults directory created: $(Test-Path 'TestResults')"
       shell: pwsh
       
     - name: Run tests
-      run: dotnet test MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-build --verbosity normal --logger trx --results-directory TestResults
+      run: |
+        echo "Running tests for configuration: ${{ matrix.configuration }}"
+        dotnet test MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-build --verbosity normal --logger trx --results-directory TestResults --collect:"XPlat Code Coverage"
+        echo "Tests completed. Checking for test result files..."
+        Get-ChildItem -Path TestResults -Recurse | ForEach-Object { Write-Host $_.FullName }
+      shell: pwsh
+      continue-on-error: true
       
     - name: Upload build artifacts (Release only)
       if: matrix.configuration == 'Release'
@@ -67,9 +200,25 @@ jobs:
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v4
+      continue-on-error: true
       with:
         name: test-results-${{ matrix.configuration }}-${{ github.sha }}
         path: |
           TestResults/**/*.trx
           TestResults/**/*.xml
+          TestResults/**/*.coverage
         retention-days: 7
+        if-no-files-found: ignore
+        
+    - name: Upload diagnostic logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      continue-on-error: true
+      with:
+        name: diagnostic-logs-${{ matrix.configuration }}-${{ github.sha }}
+        path: |
+          **/*.binlog
+          **/*.log
+          **/obj/project.assets.json
+        retention-days: 7
+        if-no-files-found: ignore

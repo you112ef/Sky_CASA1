@@ -16,6 +16,11 @@
     <Company>Medical Lab Solutions</Company>
     <Product>Medical Lab Analyzer</Product>
     <Copyright>Copyright © 2024</Copyright>
+    
+    <!-- EmguCV Performance Optimizations -->
+    <EmguCVLinkTarget>x64</EmguCVLinkTarget>
+    <EmguCVNativeFileSkip>false</EmguCVNativeFileSkip>
+    <EmguCVErrorOnMissingRuntime>true</EmguCVErrorOnMissingRuntime>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -29,13 +34,17 @@
   <ItemGroup>
     <!-- WPF and UI Dependencies -->
     <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.77" />
-    <PackageReference Include="MaterialDesignThemes" Version="4.9.0" />
+    <PackageReference Include="MaterialDesignThemes" Version="4.9.0">
+      <IncludeAssets>compile; runtime</IncludeAssets>
+      <ExcludeAssets>contentFiles</ExcludeAssets>
+    </PackageReference>
     <PackageReference Include="MaterialDesignColors" Version="2.1.4" />
     
-    <!-- EmguCV for Video Analysis -->
+    <!-- EmguCV for Video Analysis - Optimized for x64 Windows only -->
     <PackageReference Include="Emgu.CV" Version="4.8.1.5350" />
-    <PackageReference Include="Emgu.CV.runtime.windows" Version="4.8.1.5350" />
     <PackageReference Include="Emgu.CV.Bitmap" Version="4.8.1.5350" />
+    <!-- Only include x64 runtime to reduce download size -->
+    <PackageReference Include="Emgu.CV.runtime.windows" Version="4.8.1.5350" />
     
     <!-- Database and ORM -->
     <PackageReference Include="System.Data.SQLite.Core" Version="1.0.118" />
@@ -89,5 +98,14 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <!-- Custom target to validate EmguCV dependencies -->
+  <Target Name="ValidateEmguCVDependencies" AfterTargets="Restore">
+    <Message Text="Validating EmguCV dependencies for x64 runtime..." Importance="high" />
+    <ItemGroup>
+      <EmguCVFiles Include="$(NuGetPackageRoot)emgu.cv.runtime.windows\**\runtimes\win-x64\**\*.dll" />
+    </ItemGroup>
+    <Message Text="Found @(EmguCVFiles-&gt;Count()) EmguCV runtime files" Importance="high" />
+  </Target>
 
 </Project>
