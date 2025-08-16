@@ -6,6 +6,7 @@
         Height="800" Width="1200"
         WindowStartupLocation="CenterScreen"
         MinHeight="600" MinWidth="800"
+        FlowDirection="RightToLeft"
         Background="{DynamicResource MaterialDesignPaper}"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         FontFamily="{DynamicResource MaterialDesignFont}">
@@ -51,68 +52,75 @@
                 <!-- Navigation Menu -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="600">
                     <StackPanel Margin="8">
+                        <!-- Dashboard - متاح لجميع المستخدمين -->
                         <Button x:Name="btnDashboard" Style="{StaticResource NavigationButtonStyle}"
-                                Click="btnDashboard_Click">
+                                Click="btnDashboard_Click" Visibility="Visible">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="ViewDashboard" Width="20" Height="20" 
                                                        Margin="0,0,12,0"/>
-                                <TextBlock Text="Dashboard - لوحة التحكم"/>
+                                <TextBlock Text="لوحة التحكم"/>
                             </StackPanel>
                         </Button>
 
+                        <!-- Patients - متاح للمدير والمستقبل -->
                         <Button x:Name="btnPatients" Style="{StaticResource NavigationButtonStyle}"
-                                Click="btnPatients_Click">
+                                Click="btnPatients_Click" Visibility="Collapsed">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="AccountMultiple" Width="20" Height="20" 
                                                        Margin="0,0,12,0"/>
-                                <TextBlock Text="Patients - المرضى"/>
+                                <TextBlock Text="إدارة المرضى"/>
                             </StackPanel>
                         </Button>
 
+                        <!-- Exams - متاح للمدير وفني المختبر -->
                         <Button x:Name="btnExams" Style="{StaticResource NavigationButtonStyle}"
-                                Click="btnExams_Click">
+                                Click="btnExams_Click" Visibility="Collapsed">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="FileDocument" Width="20" Height="20" 
                                                        Margin="0,0,12,0"/>
-                                <TextBlock Text="Exams - الفحوصات"/>
+                                <TextBlock Text="إدارة الفحوصات"/>
                             </StackPanel>
                         </Button>
 
+                        <!-- Video Analysis - متاح للمدير وفني المختبر -->
                         <Button x:Name="btnVideoAnalysis" Style="{StaticResource NavigationButtonStyle}"
-                                Click="btnVideoAnalysis_Click">
+                                Click="btnVideoAnalysis_Click" Visibility="Collapsed">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Video" Width="20" Height="20" 
                                                        Margin="0,0,12,0"/>
-                                <TextBlock Text="Video Analysis - تحليل الفيديو"/>
+                                <TextBlock Text="تحليل الفيديو CASA"/>
                             </StackPanel>
                         </Button>
 
+                        <!-- Reports - متاح للمدير وفني المختبر -->
                         <Button x:Name="btnReports" Style="{StaticResource NavigationButtonStyle}"
-                                Click="btnReports_Click">
+                                Click="btnReports_Click" Visibility="Collapsed">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="ChartLine" Width="20" Height="20" 
                                                        Margin="0,0,12,0"/>
-                                <TextBlock Text="Reports - التقارير"/>
+                                <TextBlock Text="التقارير"/>
                             </StackPanel>
                         </Button>
 
                         <Separator Margin="16,8"/>
 
+                        <!-- Settings - متاح للمدير فقط -->
                         <Button x:Name="btnSettings" Style="{StaticResource NavigationButtonStyle}"
-                                Click="btnSettings_Click">
+                                Click="btnSettings_Click" Visibility="Collapsed">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Settings" Width="20" Height="20" 
                                                        Margin="0,0,12,0"/>
-                                <TextBlock Text="Settings - الإعدادات"/>
+                                <TextBlock Text="الإعدادات"/>
                             </StackPanel>
                         </Button>
 
+                        <!-- Backup - متاح للمدير فقط -->
                         <Button x:Name="btnBackup" Style="{StaticResource NavigationButtonStyle}"
-                                Click="btnBackup_Click">
+                                Click="btnBackup_Click" Visibility="Collapsed">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="BackupRestore" Width="20" Height="20" 
                                                        Margin="0,0,12,0"/>
-                                <TextBlock Text="Backup - النسخ الاحتياطي"/>
+                                <TextBlock Text="النسخ الاحتياطي"/>
                             </StackPanel>
                         </Button>
                     </StackPanel>

@@ -1,0 +1,175 @@
+<Window x:Class="MedicalLabAnalyzer.Views.LoginView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="تسجيل الدخول - نظام تحليل المختبر الطبي" 
+        Height="500" Width="400"
+        WindowStartupLocation="CenterScreen"
+        FlowDirection="RightToLeft"
+        Background="#F5F5F5"
+        ResizeMode="NoResize">
+    
+    <Window.Resources>
+        <Style x:Key="LoginButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#2196F3"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="20,10"/>
+            <Setter Property="Margin" Value="0,10"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="5"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" 
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#1976D2"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#0D47A1"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        
+        <Style x:Key="LoginTextBoxStyle" TargetType="TextBox">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="0,5"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#DDD"/>
+            <Setter Property="Background" Value="White"/>
+        </Style>
+        
+        <Style x:Key="LoginPasswordBoxStyle" TargetType="PasswordBox">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="0,5"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#DDD"/>
+            <Setter Property="Background" Value="White"/>
+        </Style>
+    </Window.Resources>
+    
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#2196F3" Padding="20">
+            <StackPanel>
+                <TextBlock Text="نظام تحليل المختبر الطبي" 
+                           FontSize="20" 
+                           FontWeight="Bold" 
+                           Foreground="White" 
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="Medical Laboratory Analysis System" 
+                           FontSize="12" 
+                           Foreground="#E3F2FD" 
+                           HorizontalAlignment="Center" 
+                           Margin="0,5,0,0"/>
+            </StackPanel>
+        </Border>
+        
+        <!-- Login Form -->
+        <StackPanel Grid.Row="1" 
+                    VerticalAlignment="Center" 
+                    HorizontalAlignment="Center" 
+                    Width="300">
+            
+            <TextBlock Text="تسجيل الدخول" 
+                       FontSize="24" 
+                       FontWeight="Bold" 
+                       Foreground="#333" 
+                       HorizontalAlignment="Center" 
+                       Margin="0,0,0,30"/>
+            
+            <!-- Username -->
+            <TextBlock Text="اسم المستخدم:" 
+                       FontSize="14" 
+                       FontWeight="SemiBold" 
+                       Foreground="#555" 
+                       Margin="0,0,0,5"/>
+            <TextBox x:Name="txtUsername" 
+                     Style="{StaticResource LoginTextBoxStyle}"
+                     Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
+                     Tag="أدخل اسم المستخدم"/>
+            
+            <!-- Password -->
+            <TextBlock Text="كلمة المرور:" 
+                       FontSize="14" 
+                       FontWeight="SemiBold" 
+                       Foreground="#555" 
+                       Margin="0,20,0,5"/>
+            <PasswordBox x:Name="txtPassword" 
+                         Style="{StaticResource LoginPasswordBoxStyle}"
+                         Tag="أدخل كلمة المرور"/>
+            
+            <!-- Role Selection -->
+            <TextBlock Text="نوع المستخدم:" 
+                       FontSize="14" 
+                       FontWeight="SemiBold" 
+                       Foreground="#555" 
+                       Margin="0,20,0,5"/>
+            <ComboBox x:Name="cmbRole" 
+                      Style="{StaticResource LoginTextBoxStyle}"
+                      SelectedItem="{Binding SelectedRole}"
+                      ItemsSource="{Binding AvailableRoles}"
+                      DisplayMemberPath="DisplayName"
+                      SelectedValuePath="RoleType"/>
+            
+            <!-- Error Message -->
+            <TextBlock x:Name="txtErrorMessage" 
+                       Text="{Binding ErrorMessage}" 
+                       Foreground="Red" 
+                       FontSize="12" 
+                       HorizontalAlignment="Center" 
+                       Margin="0,10" 
+                       TextWrapping="Wrap"
+                       Visibility="{Binding HasError, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            
+            <!-- Login Button -->
+            <Button Content="تسجيل الدخول" 
+                    Style="{StaticResource LoginButtonStyle}"
+                    Command="{Binding LoginCommand}"
+                    IsEnabled="{Binding CanLogin}"/>
+            
+            <!-- Loading Indicator -->
+            <ProgressBar x:Name="progressBar" 
+                         Height="3" 
+                         Margin="0,10" 
+                         Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}"
+                         IsIndeterminate="True"/>
+        </StackPanel>
+        
+        <!-- Footer -->
+        <Border Grid.Row="2" 
+                Background="#FAFAFA" 
+                BorderBrush="#E0E0E0" 
+                BorderThickness="0,1,0,0" 
+                Padding="20,10">
+            <StackPanel>
+                <TextBlock Text="الإصدار 1.0.0 - نظام آمن ومتطور" 
+                           FontSize="11" 
+                           Foreground="#666" 
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="© 2024 Medical Laboratory Analysis System" 
+                           FontSize="10" 
+                           Foreground="#999" 
+                           HorizontalAlignment="Center" 
+                           Margin="0,5,0,0"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
