@@ -5,8 +5,6 @@ using Serilog;
 using System;
 using System.Windows;
 using MedicalLabAnalyzer.Services;
-using MedicalLabAnalyzer.Data;
-using MedicalLabAnalyzer.ViewModels;
 using MedicalLabAnalyzer.Views;
 
 namespace MedicalLabAnalyzer
@@ -37,18 +35,19 @@ namespace MedicalLabAnalyzer
                             builder.AddSerilog();
                         });
 
-                        // Configure Entity Framework
-                        services.AddDbContext<MedicalLabContext>(options =>
-                        {
-                            options.UseSqlite("Data Source=Database/medical_lab.db");
-                        });
-
                         // Register services
                         services.AddScoped<DatabaseService>();
                         services.AddScoped<AuthService>();
+                        services.AddScoped<UserService>();
+                        services.AddScoped<PatientService>();
                         services.AddScoped<CalibrationService>();
                         services.AddScoped<ImageAnalysisService>();
+                        services.AddScoped<VideoAnalysisService>();
                         services.AddScoped<ReportService>();
+                        services.AddScoped<CBCAnalyzer>();
+                        services.AddScoped<UrineAnalyzer>();
+                        services.AddScoped<StoolAnalyzer>();
+                        services.AddScoped<AuditLogger>();
 
                         // Register Views
                         services.AddTransient<MainWindow>();
@@ -59,21 +58,26 @@ namespace MedicalLabAnalyzer
                 // Initialize database
                 using (var scope = _host.Services.CreateScope())
                 {
-                    var context = scope.ServiceProvider.GetRequiredService<MedicalLabContext>();
-                    await context.Database.EnsureCreatedAsync();
+                    var dbService = scope.ServiceProvider.GetRequiredService<DatabaseService>();
+                    var authService = scope.ServiceProvider.GetRequiredService<AuthService>();
                     
-                    // Seed initial data
-                    var seeder = new DatabaseSeeder(context);
-                    await seeder.SeedAsync();
+                    // Database will be created automatically by DatabaseService
+                    // AuthService will create initial admin user if needed
                 }
 
                 // Get logger
                 _logger = _host.Services.GetRequiredService<ILogger<App>>();
                 _logger.LogInformation("Application started successfully");
 
+<<<<<<< HEAD
                 // Show main window
                 var mainWindow = _host.Services.GetRequiredService<MainWindow>();
                 mainWindow.Show();
+=======
+                // Show login window first
+                var loginWindow = new Views.LoginView();
+                loginWindow.Show();
+>>>>>>> release/v1.0.0
 
                 base.OnStartup(e);
             }

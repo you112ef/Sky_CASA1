@@ -2,11 +2,11 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        xmlns:views="clr-namespace:MedicalLabAnalyzer.Views"
         Title="Medical Lab Analyzer - نظام تحليل المختبر الطبي"
         Height="800" Width="1200"
         WindowStartupLocation="CenterScreen"
         MinHeight="600" MinWidth="800"
+        FlowDirection="RightToLeft"
         Background="{DynamicResource MaterialDesignPaper}"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         FontFamily="{DynamicResource MaterialDesignFont}">
@@ -52,6 +52,7 @@
                 <!-- Navigation Menu -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="600">
                     <StackPanel Margin="8">
+<<<<<<< HEAD
                         <Button x:Name="btnDashboard" Style="{StaticResource NavigationButtonStyle}"
                                 Click="NavigationButton_Click" Tag="Dashboard">
                             <StackPanel Orientation="Horizontal">
@@ -94,11 +95,61 @@
                                 <materialDesign:PackIcon Kind="ChartLine" Width="20" Height="20" 
                                                        Margin="0,0,12,0"/>
                                 <TextBlock Text="Reports - التقارير"/>
+=======
+                        <!-- Dashboard - متاح لجميع المستخدمين -->
+                        <Button x:Name="btnDashboard" Style="{StaticResource NavigationButtonStyle}"
+                                Click="btnDashboard_Click" Visibility="Visible">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="ViewDashboard" Width="20" Height="20" 
+                                                       Margin="0,0,12,0"/>
+                                <TextBlock Text="لوحة التحكم"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Patients - متاح للمدير والمستقبل -->
+                        <Button x:Name="btnPatients" Style="{StaticResource NavigationButtonStyle}"
+                                Click="btnPatients_Click" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="AccountMultiple" Width="20" Height="20" 
+                                                       Margin="0,0,12,0"/>
+                                <TextBlock Text="إدارة المرضى"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Exams - متاح للمدير وفني المختبر -->
+                        <Button x:Name="btnExams" Style="{StaticResource NavigationButtonStyle}"
+                                Click="btnExams_Click" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="FileDocument" Width="20" Height="20" 
+                                                       Margin="0,0,12,0"/>
+                                <TextBlock Text="إدارة الفحوصات"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Video Analysis - متاح للمدير وفني المختبر -->
+                        <Button x:Name="btnVideoAnalysis" Style="{StaticResource NavigationButtonStyle}"
+                                Click="btnVideoAnalysis_Click" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Video" Width="20" Height="20" 
+                                                       Margin="0,0,12,0"/>
+                                <TextBlock Text="تحليل الفيديو CASA"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Reports - متاح للمدير وفني المختبر -->
+                        <Button x:Name="btnReports" Style="{StaticResource NavigationButtonStyle}"
+                                Click="btnReports_Click" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="ChartLine" Width="20" Height="20" 
+                                                       Margin="0,0,12,0"/>
+                                <TextBlock Text="التقارير"/>
+>>>>>>> release/v1.0.0
                             </StackPanel>
                         </Button>
 
                         <Separator Margin="16,8"/>
 
+<<<<<<< HEAD
                         <Button x:Name="btnSettings" Style="{StaticResource NavigationButtonStyle}"
                                 Click="NavigationButton_Click" Tag="Settings">
                             <StackPanel Orientation="Horizontal">
@@ -114,6 +165,25 @@
                                 <materialDesign:PackIcon Kind="BackupRestore" Width="20" Height="20" 
                                                        Margin="0,0,12,0"/>
                                 <TextBlock Text="Backup - النسخ الاحتياطي"/>
+=======
+                        <!-- Settings - متاح للمدير فقط -->
+                        <Button x:Name="btnSettings" Style="{StaticResource NavigationButtonStyle}"
+                                Click="btnSettings_Click" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Settings" Width="20" Height="20" 
+                                                       Margin="0,0,12,0"/>
+                                <TextBlock Text="الإعدادات"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Backup - متاح للمدير فقط -->
+                        <Button x:Name="btnBackup" Style="{StaticResource NavigationButtonStyle}"
+                                Click="btnBackup_Click" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="BackupRestore" Width="20" Height="20" 
+                                                       Margin="0,0,12,0"/>
+                                <TextBlock Text="النسخ الاحتياطي"/>
+>>>>>>> release/v1.0.0
                             </StackPanel>
                         </Button>
                     </StackPanel>
@@ -151,6 +221,7 @@
             </materialDesign:Card>
 
             <!-- Content Frame -->
+<<<<<<< HEAD
             <Frame x:Name="MainFrame" Grid.Row="1" 
                    NavigationUIVisibility="Hidden"
                    Background="{DynamicResource MaterialDesignPaper}"/>
@@ -158,6 +229,14 @@
 
         <!-- Loading Overlay -->
         <Grid x:Name="LoadingOverlay" Grid.ColumnSpan="2" 
+=======
+            <ContentControl x:Name="contentFrame" Grid.Row="1" 
+                           Background="{DynamicResource MaterialDesignPaper}"/>
+        </Grid>
+
+        <!-- Loading Overlay -->
+        <Grid x:Name="loadingOverlay" Grid.ColumnSpan="2" 
+>>>>>>> release/v1.0.0
               Background="#80000000" Visibility="Collapsed">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <ProgressBar IsIndeterminate="True" Width="100" Height="4" 

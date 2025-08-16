@@ -99,6 +99,31 @@ ipch/
 # Visual Studio Trace Files
 *.e2e
 
+# MedicalLabAnalyzer specific files
+Database/*.db
+Database/*.db-journal
+Reports/Archive/
+Reports/Temp/
+Samples/Processed/
+logs/
+*.log
+
+# User-specific files
+appsettings.Development.json
+appsettings.Production.json
+
+# Build artifacts
+dist/
+installer/
+*.msi
+*.exe
+*.zip
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
 # TFS 2012 Local Workspace
 $tf/
 
