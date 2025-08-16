@@ -44,11 +44,11 @@ namespace MedicalLabAnalyzer
                         });
 
                         // Register services
-                        services.AddScoped<IPatientService, PatientService>();
-                        services.AddScoped<IExamService, ExamService>();
-                        services.AddScoped<IVideoAnalysisService, VideoAnalysisService>();
-                        services.AddScoped<IReportService, ReportService>();
-                        services.AddScoped<IBackupService, BackupService>();
+                        services.AddScoped<DatabaseService>();
+                        services.AddScoped<AuthService>();
+                        services.AddScoped<CalibrationService>();
+                        services.AddScoped<ImageAnalysisService>();
+                        services.AddScoped<ReportService>();
 
                         // Register ViewModels
                         services.AddTransient<MainViewModel>();

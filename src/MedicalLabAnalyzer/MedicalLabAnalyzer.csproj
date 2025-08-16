@@ -66,6 +66,12 @@
     <PackageReference Include="AutoMapper" Version="12.0.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     
+    <!-- Optional: Excel Export -->
+    <PackageReference Include="EPPlus" Version="7.0.5" />
+    
+    <!-- Optional: MVVM Framework -->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    
     <!-- Testing Support -->
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.6.2" />
