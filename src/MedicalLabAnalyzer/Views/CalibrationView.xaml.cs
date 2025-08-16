@@ -1,107 +1,37 @@
-using System;
-using System.Data.SQLite;
 using System.Windows;
-using MedicalLabAnalyzer.Services;
+using MedicalLabAnalyzer.ViewModels;
 
 namespace MedicalLabAnalyzer.Views
 {
     public partial class CalibrationView : Window
     {
-        private string _connectionString = "Data Source=Database/medical_lab.db;Version=3;";
-
+        private CalibrationViewModel _viewModel;
+        
         public CalibrationView()
         {
             InitializeComponent();
-            LoadDefaultValues();
-        }
-
-        private void LoadDefaultValues()
-        {
-            try
-            {
-                using (var conn = new SQLiteConnection(_connectionString))
-                {
-                    conn.Open();
-                    string sql = "SELECT MicronsPerPixel, FPS FROM Calibration ORDER BY CreatedAt DESC LIMIT 1";
-                    using (var cmd = new SQLiteCommand(sql, conn))
-                    {
-                        using (var reader = cmd.ExecuteReader())
-                        {
-                            if (reader.Read())
-                            {
-                                txtMicronsPerPixel.Text = reader["MicronsPerPixel"].ToString();
-                                txtFPS.Text = reader["FPS"].ToString();
-                            }
-                        }
-                    }
-                }
-            }
-            catch
-            {
-                // Use default values if database not accessible
-                txtMicronsPerPixel.Text = "0.5";
-                txtFPS.Text = "25.0";
-            }
             
-            txtUser.Text = Environment.UserName;
+            _viewModel = new CalibrationViewModel();
+            DataContext = _viewModel;
+            
+            // Subscribe to close request
+            _viewModel.RequestClose += OnRequestClose;
         }
-
-        private void BtnSave_Click(object sender, RoutedEventArgs e)
+        
+        private void OnRequestClose(object sender, bool dialogResult)
         {
-            if (string.IsNullOrWhiteSpace(txtMicronsPerPixel.Text) ||
-                string.IsNullOrWhiteSpace(txtFPS.Text) ||
-                string.IsNullOrWhiteSpace(txtUser.Text))
-            {
-                MessageBox.Show("الرجاء إدخال جميع الحقول", "تنبيه", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            if (!double.TryParse(txtMicronsPerPixel.Text, out double micronsPerPixel) || micronsPerPixel <= 0)
-            {
-                MessageBox.Show("الرجاء إدخال قيمة صحيحة لـ Microns/Pixel", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            if (!double.TryParse(txtFPS.Text, out double fps) || fps <= 0)
-            {
-                MessageBox.Show("الرجاء إدخال قيمة صحيحة لـ FPS", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            try
-            {
-                using (var conn = new SQLiteConnection(_connectionString))
-                {
-                    conn.Open();
-
-                    string sql = @"INSERT INTO Calibration (MicronsPerPixel, FPS, UserName, CreatedAt)
-                                   VALUES (@MicronsPerPixel, @FPS, @UserName, @CreatedAt)";
-
-                    using (var cmd = new SQLiteCommand(sql, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@MicronsPerPixel", micronsPerPixel);
-                        cmd.Parameters.AddWithValue("@FPS", fps);
-                        cmd.Parameters.AddWithValue("@UserName", txtUser.Text);
-                        cmd.Parameters.AddWithValue("@CreatedAt", DateTime.Now);
-
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-
-                AuditLogger.Log("Calibration", $"تم حفظ المعايرة من قبل {txtUser.Text} - MicronsPerPixel: {micronsPerPixel}, FPS: {fps}");
-
-                MessageBox.Show("تم الحفظ بنجاح", "نجاح", MessageBoxButton.OK, MessageBoxImage.Information);
-                this.Close();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"خطأ في حفظ البيانات: {ex.Message}", "خطأ", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            DialogResult = dialogResult;
+            Close();
         }
-
-        private void BtnCancel_Click(object sender, RoutedEventArgs e)
+        
+        protected override void OnClosed(System.EventArgs e)
         {
-            this.Close();
+            // Unsubscribe from events to prevent memory leaks
+            if (_viewModel != null)
+            {
+                _viewModel.RequestClose -= OnRequestClose;
+            }
+            base.OnClosed(e);
         }
     }
 }

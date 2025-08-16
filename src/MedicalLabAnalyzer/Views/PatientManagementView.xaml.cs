@@ -1,4 +1,5 @@
 using System.Windows.Controls;
+using MedicalLabAnalyzer.ViewModels;
 
 namespace MedicalLabAnalyzer.Views
 {
@@ -7,6 +8,7 @@ namespace MedicalLabAnalyzer.Views
         public PatientManagementView()
         {
             InitializeComponent();
+            DataContext = new PatientManagementViewModel();
         }
     }
 }

@@ -8,6 +8,7 @@ using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
 using MedicalLabAnalyzer.Helpers;
 using MedicalLabAnalyzer.Models;
+using Microsoft.Extensions.Logging;
 
 namespace MedicalLabAnalyzer.Services
 {
@@ -50,11 +51,10 @@ namespace MedicalLabAnalyzer.Services
 
             _logger?.LogInformation($"Video FPS: {fps}");
 
-            // Initialize background subtractor
-            var bg = new BackgroundSubtractorMOG2(
+            // Initialize background subtractor using frame differencing
+            var backgroundSubtractor = new FrameDifferencingBackgroundSubtractor(
                 (int)_parameters.BackgroundSubtractionHistory, 
-                _parameters.BackgroundSubtractionThreshold, 
-                false);
+                _parameters.BackgroundSubtractionThreshold);
 
             // Initialize multi-tracker
             var tracker = new MultiTracker
@@ -77,7 +77,7 @@ namespace MedicalLabAnalyzer.Services
                     double timeSec = frameIndex / fps;
 
                     // Process frame
-                    var detections = ProcessFrame(frame, bg);
+                    var detections = ProcessFrame(frame, backgroundSubtractor);
                     
                     // Update tracker
                     tracker.PredictAll();
@@ -127,7 +127,7 @@ namespace MedicalLabAnalyzer.Services
         /// <param name="frame">Input frame</param>
         /// <param name="bg">Background subtractor</param>
         /// <returns>List of detected positions (x, y)</returns>
-        private List<(double x, double y)> ProcessFrame(Mat frame, BackgroundSubtractorMOG2 bg)
+        private List<(double x, double y)> ProcessFrame(Mat frame, FrameDifferencingBackgroundSubtractor bg)
         {
             var detections = new List<(double x, double y)>();
 
@@ -482,6 +482,126 @@ namespace MedicalLabAnalyzer.Services
             double mean = velocities.Average();
             double variance = velocities.Select(v => Math.Pow(v - mean, 2)).Average();
             return variance;
+        }
+    }
+
+    /// <summary>
+    /// Custom background subtractor using frame differencing
+    /// </summary>
+    public class FrameDifferencingBackgroundSubtractor
+    {
+        private readonly int _history;
+        private readonly double _threshold;
+        private readonly Queue<Mat> _frameHistory;
+        private Mat _backgroundModel;
+
+        public FrameDifferencingBackgroundSubtractor(int history, double threshold)
+        {
+            _history = history;
+            _threshold = threshold;
+            _frameHistory = new Queue<Mat>();
+            _backgroundModel = null;
+        }
+
+        public void Apply(Mat frame, Mat foreground)
+        {
+            if (_backgroundModel == null)
+            {
+                // Initialize background model
+                _backgroundModel = frame.Clone();
+                _frameHistory.Enqueue(frame.Clone());
+                foreground.SetTo(new MCvScalar(0));
+                return;
+            }
+
+            // Add current frame to history
+            _frameHistory.Enqueue(frame.Clone());
+            if (_frameHistory.Count > _history)
+            {
+                var oldFrame = _frameHistory.Dequeue();
+                oldFrame.Dispose();
+            }
+
+            // Update background model using running average
+            if (_frameHistory.Count > 0)
+            {
+                using var temp = new Mat();
+                CvInvoke.AddWeighted(_backgroundModel, 0.9, frame, 0.1, 0, temp);
+                _backgroundModel.SetTo(temp);
+            }
+
+            // Calculate difference
+            CvInvoke.Absdiff(frame, _backgroundModel, foreground);
+            
+            // Apply threshold
+            CvInvoke.Threshold(foreground, foreground, _threshold, 255, ThresholdType.Binary);
+        }
+
+        public void Dispose()
+        {
+            _backgroundModel?.Dispose();
+            foreach (var frame in _frameHistory)
+            {
+                frame.Dispose();
+            }
+            _frameHistory.Clear();
+        }
+        
+        /// <summary>
+        /// Count sperm in a single frame for WHO 2021 analysis
+        /// </summary>
+        /// <param name="frame">Video frame to analyze</param>
+        /// <returns>Estimated sperm count in the frame</returns>
+        public async Task<int> CountSpermInFrameAsync(Mat frame)
+        {
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    // Convert to grayscale
+                    using var gray = new Mat();
+                    CvInvoke.CvtColor(frame, gray, ColorConversion.Bgr2Gray);
+                    
+                    // Apply Gaussian blur to reduce noise
+                    using var blurred = new Mat();
+                    CvInvoke.GaussianBlur(gray, blurred, new System.Drawing.Size(5, 5), 1.2);
+                    
+                    // Apply threshold to get binary image
+                    using var threshold = new Mat();
+                    CvInvoke.Threshold(blurred, threshold, 0, 255, ThresholdType.Binary | ThresholdType.Otsu);
+                    
+                    // Morphological operations to clean up
+                    using var kernel = CvInvoke.GetStructuringElement(ElementShape.Ellipse, new System.Drawing.Size(3, 3), new System.Drawing.Point(-1, -1));
+                    using var morphed = new Mat();
+                    CvInvoke.MorphologyEx(threshold, morphed, MorphOp.Open, kernel, new System.Drawing.Point(-1, -1), 1, BorderType.Replicate, new MCvScalar());
+                    
+                    // Find contours
+                    using var contours = new VectorOfVectorOfPoint();
+                    using var hierarchy = new Mat();
+                    CvInvoke.FindContours(morphed, contours, hierarchy, RetrType.External, ChainApproxMethod.ChainApproxSimple);
+                    
+                    // Count valid sperm-like objects
+                    var spermCount = 0;
+                    for (int i = 0; i < contours.Size; i++)
+                    {
+                        var contour = contours[i];
+                        var area = CvInvoke.ContourArea(contour);
+                        
+                        // Filter by area (typical sperm head: 6-15 pixels)
+                        if (area >= _parameters.MinBlobAreaPx && area <= 30.0)
+                        {
+                            spermCount++;
+                        }
+                    }
+                    
+                    return spermCount;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Error counting sperm in frame");
+                    return 0;
+                }
+            });
         }
     }
 }

@@ -49,6 +49,8 @@ Microsoft.Extensions.Logging 8.0.0 (التسجيل)
 Serilog 3.1.1 (تسجيل متقدم)
 FluentValidation 11.8.1 (التحقق من البيانات)
 AutoMapper 12.0.1 (تحويل البيانات)
+CommunityToolkit.Mvvm 8.2.2 (MVVM Framework)
+MaterialDesignThemes 4.9.0 (واجهة المستخدم)
 ```
 
 ## 🚀 التثبيت والتشغيل

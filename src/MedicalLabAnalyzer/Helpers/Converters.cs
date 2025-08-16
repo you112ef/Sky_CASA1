@@ -9,20 +9,12 @@ namespace MedicalLabAnalyzer.Helpers
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is bool boolValue)
-            {
-                return boolValue ? Visibility.Visible : Visibility.Collapsed;
-            }
-            return Visibility.Collapsed;
+            return value is bool boolValue && boolValue ? Visibility.Visible : Visibility.Collapsed;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is Visibility visibility)
-            {
-                return visibility == Visibility.Visible;
-            }
-            return false;
+            return value is Visibility visibility && visibility == Visibility.Visible;
         }
     }
 
@@ -30,20 +22,12 @@ namespace MedicalLabAnalyzer.Helpers
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is bool boolValue)
-            {
-                return boolValue ? Visibility.Collapsed : Visibility.Visible;
-            }
-            return Visibility.Visible;
+            return value is bool boolValue && boolValue ? Visibility.Collapsed : Visibility.Visible;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is Visibility visibility)
-            {
-                return visibility == Visibility.Collapsed;
-            }
-            return true;
+            return value is Visibility visibility && visibility == Visibility.Collapsed;
         }
     }
 
@@ -51,29 +35,12 @@ namespace MedicalLabAnalyzer.Helpers
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is string stringValue)
-            {
-                return string.IsNullOrEmpty(stringValue) ? Visibility.Collapsed : Visibility.Visible;
-            }
-            return Visibility.Collapsed;
+            return string.IsNullOrEmpty(value as string) ? Visibility.Collapsed : Visibility.Visible;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
-        }
-    }
-
-    public class NullToVisibilityConverter : IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            return value == null ? Visibility.Collapsed : Visibility.Visible;
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            throw new NotImplementedException();
+            return value is Visibility visibility && visibility == Visibility.Visible ? "Visible" : "Hidden";
         }
     }
 
@@ -81,39 +48,25 @@ namespace MedicalLabAnalyzer.Helpers
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is DateTime dateTime)
-            {
-                return dateTime.ToString("dd/MM/yyyy HH:mm", CultureInfo.CurrentCulture);
-            }
-            return "";
+            return value is DateTime dateTime ? dateTime.ToString("dd/MM/yyyy HH:mm") : "";
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
+            return DateTime.TryParse(value as string, out DateTime result) ? result : DateTime.Now;
         }
     }
-
-    public class StatusToColorConverter : IValueConverter
+    
+    public class InverseBooleanConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is string status)
-            {
-                return status.ToLower() switch
-                {
-                    "normal" => "#4CAF50", // Green
-                    "abnormal" => "#FF9800", // Orange
-                    "critical" => "#F44336", // Red
-                    _ => "#757575" // Gray
-                };
-            }
-            return "#757575";
+            return !(value is bool boolValue && boolValue);
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
+            return !(value is bool boolValue && boolValue);
         }
     }
 }

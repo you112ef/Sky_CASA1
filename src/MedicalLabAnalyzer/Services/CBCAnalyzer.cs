@@ -5,6 +5,7 @@ using MedicalLabAnalyzer.Models;
 using Microsoft.Extensions.Logging;
 using System.Data;
 using Dapper;
+using System.Linq;
 
 namespace MedicalLabAnalyzer.Services
 {
@@ -93,7 +94,7 @@ namespace MedicalLabAnalyzer.Services
         {
             try
             {
-                var sql = "SELECT * FROM CBCTestResults WHERE ExamId = @ExamId";
+                var sql = "SELECT * FROM CBC_Results WHERE ExamId = @ExamId";
                 return await _db.QueryFirstOrDefaultAsync<CBCTestResult>(sql, new { ExamId = examId });
             }
             catch (Exception ex)
@@ -111,10 +112,10 @@ namespace MedicalLabAnalyzer.Services
             try
             {
                 var sql = @"
-                    SELECT c.* FROM CBCTestResults c
-                    JOIN Exams e ON c.ExamId = e.Id
+                    SELECT c.* FROM CBC_Results c
+                    JOIN Exams e ON c.ExamId = e.ExamId
                     WHERE e.PatientId = @PatientId
-                    ORDER BY c.TestDate DESC";
+                    ORDER BY c.CreatedAt DESC";
                 
                 var results = await _db.QueryAsync<CBCTestResult>(sql, new { PatientId = patientId });
                 return results.AsList();
@@ -136,20 +137,31 @@ namespace MedicalLabAnalyzer.Services
                 result.ValidateResults();
                 
                 var sql = @"
-                    UPDATE CBCTestResults SET
-                        WBC = @WBC, RBC = @RBC, Hemoglobin = @Hemoglobin, Hematocrit = @Hematocrit,
-                        Platelets = @Platelets, MCV = @MCV, MCH = @MCH, MCHC = @MCHC, RDW = @RDW,
-                        Neutrophils = @Neutrophils, Lymphocytes = @Lymphocytes, Monocytes = @Monocytes,
-                        Eosinophils = @Eosinophils, Basophils = @Basophils, Status = @Status,
-                        Notes = @Notes, TestDate = @TestDate
-                    WHERE Id = @Id";
+                    UPDATE CBC_Results SET
+                        WBC = @WBC, RBC = @RBC, HGB = @Hemoglobin, HCT = @Hematocrit,
+                        PLT = @Platelets, MCV = @MCV, MCH = @MCH, MCHC = @MCHC, RDW = @RDW,
+                        CreatedAt = @TestDate
+                    WHERE ExamId = @ExamId";
                 
-                var rowsAffected = await _db.ExecuteAsync(sql, result);
+                var rowsAffected = await _db.ExecuteAsync(sql, new
+                {
+                    result.ExamId,
+                    result.WBC,
+                    result.RBC,
+                    result.Hemoglobin,
+                    result.Hematocrit,
+                    result.Platelets,
+                    result.MCV,
+                    result.MCH,
+                    result.MCHC,
+                    result.RDW,
+                    result.TestDate
+                });
                 
                 if (rowsAffected > 0)
                 {
                     _auditLogger?.LogSystemEvent(userId, userName, "CBC_Result_Updated", "CBC", 
-                        new { ResultId = result.Id, ExamId = result.ExamId, Status = result.Status });
+                        new { ExamId = result.ExamId, Status = result.Status });
                     
                     _logger?.LogInformation("CBC result updated for exam {ExamId}", result.ExamId);
                     return true;
@@ -176,7 +188,7 @@ namespace MedicalLabAnalyzer.Services
                 
                 if (startDate.HasValue && endDate.HasValue)
                 {
-                    whereClause = "WHERE TestDate BETWEEN @StartDate AND @EndDate";
+                    whereClause = "WHERE CreatedAt BETWEEN @StartDate AND @EndDate";
                     parameters.Add("@StartDate", startDate.Value);
                     parameters.Add("@EndDate", endDate.Value);
                 }
@@ -189,10 +201,10 @@ namespace MedicalLabAnalyzer.Services
                         COUNT(CASE WHEN Status = 'Critical' THEN 1 END) as CriticalTests,
                         AVG(WBC) as AvgWBC,
                         AVG(RBC) as AvgRBC,
-                        AVG(Hemoglobin) as AvgHemoglobin,
-                        AVG(Hematocrit) as AvgHematocrit,
-                        AVG(Platelets) as AvgPlatelets
-                    FROM CBCTestResults {whereClause}";
+                        AVG(HGB) as AvgHemoglobin,
+                        AVG(HCT) as AvgHematocrit,
+                        AVG(PLT) as AvgPlatelets
+                    FROM CBC_Results {whereClause}";
 
                 var stats = await _db.QueryFirstAsync<CBCStatistics>(sql, parameters);
                 return stats;
@@ -289,14 +301,25 @@ namespace MedicalLabAnalyzer.Services
         private void SaveCBCResult(CBCTestResult result)
         {
             var sql = @"
-                INSERT INTO CBCTestResults (ExamId, WBC, RBC, Hemoglobin, Hematocrit, Platelets, 
-                    MCV, MCH, MCHC, RDW, Neutrophils, Lymphocytes, Monocytes, Eosinophils, 
-                    Basophils, TestDate, Notes, Status)
+                INSERT INTO CBC_Results (ExamId, WBC, RBC, HGB, HCT, PLT, 
+                    MCV, MCH, MCHC, RDW, CreatedAt)
                 VALUES (@ExamId, @WBC, @RBC, @Hemoglobin, @Hematocrit, @Platelets, 
-                    @MCV, @MCH, @MCHC, @RDW, @Neutrophils, @Lymphocytes, @Monocytes, @Eosinophils, 
-                    @Basophils, @TestDate, @Notes, @Status)";
+                    @MCV, @MCH, @MCHC, @RDW, @TestDate)";
             
-            _db.Execute(sql, result);
+            _db.Execute(sql, new
+            {
+                result.ExamId,
+                result.WBC,
+                result.RBC,
+                result.Hemoglobin,
+                result.Hematocrit,
+                result.Platelets,
+                result.MCV,
+                result.MCH,
+                result.MCHC,
+                result.RDW,
+                result.TestDate
+            });
         }
 
         private async Task<Dictionary<string, double>> ParseCBCFileAsync(string filePath)

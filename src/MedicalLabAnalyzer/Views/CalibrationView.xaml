@@ -1,9 +1,15 @@
 <Window x:Class="MedicalLabAnalyzer.Views.CalibrationView"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:converters="clr-namespace:MedicalLabAnalyzer.Helpers"
         Title="معايرة النظام" Height="350" Width="500"
         FlowDirection="RightToLeft"
         WindowStartupLocation="CenterScreen">
+    
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <converters:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
+    </Window.Resources>
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -20,22 +26,28 @@
 
         <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,10">
             <TextBlock Text="تكبير العدسة (Microns/Pixel):" Width="200" VerticalAlignment="Center"/>
-            <TextBox x:Name="txtMicronsPerPixel" Width="200"/>
+            <TextBox Text="{Binding MicronsPerPixel}" Width="200" 
+                     IsEnabled="{Binding IsLoading, Converter={StaticResource InverseBooleanConverter}}"/>
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" Grid.Row="2" Margin="0,0,0,10">
             <TextBlock Text="معدل الإطار (Frames per Second):" Width="200" VerticalAlignment="Center"/>
-            <TextBox x:Name="txtFPS" Width="200"/>
+            <TextBox Text="{Binding FPS}" Width="200" 
+                     IsEnabled="{Binding IsLoading, Converter={StaticResource InverseBooleanConverter}}"/>
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" Grid.Row="3" Margin="0,0,0,10">
             <TextBlock Text="اسم المستخدم:" Width="200" VerticalAlignment="Center"/>
-            <TextBox x:Name="txtUser" Width="200"/>
+            <TextBox Text="{Binding UserName}" Width="200" 
+                     IsEnabled="{Binding IsLoading, Converter={StaticResource InverseBooleanConverter}}"/>
         </StackPanel>
 
         <StackPanel Orientation="Horizontal" Grid.Row="4" HorizontalAlignment="Right">
-            <Button Content="حفظ" Width="100" Margin="5" Click="BtnSave_Click"/>
-            <Button Content="إلغاء" Width="100" Margin="5" Click="BtnCancel_Click"/>
+            <Button Content="حفظ" Width="100" Margin="5" 
+                    Command="{Binding SaveCommand}"
+                    IsEnabled="{Binding CanSave}"/>
+            <Button Content="إلغاء" Width="100" Margin="5" 
+                    Command="{Binding CancelCommand}"/>
         </StackPanel>
     </Grid>
 </Window>

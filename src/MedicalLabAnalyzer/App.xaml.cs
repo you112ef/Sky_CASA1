@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using Serilog.Extensions.Hosting;
 using System;
 using System.Windows;
 using MedicalLabAnalyzer.Services;
@@ -27,6 +28,7 @@ namespace MedicalLabAnalyzer
 
                 // Build host with dependency injection
                 _host = Host.CreateDefaultBuilder()
+                    .UseSerilog()
                     .ConfigureServices((context, services) =>
                     {
                         // Configure logging
@@ -35,19 +37,19 @@ namespace MedicalLabAnalyzer
                             builder.AddSerilog();
                         });
 
-                                        // Register services
-                services.AddScoped<DatabaseService>();
-                services.AddScoped<AuthService>();
-                services.AddScoped<UserService>();
-                services.AddScoped<PatientService>();
-                services.AddScoped<CalibrationService>();
-                services.AddScoped<ImageAnalysisService>();
-                services.AddScoped<VideoAnalysisService>();
-                services.AddScoped<ReportService>();
-                services.AddScoped<CBCAnalyzer>();
-                services.AddScoped<UrineAnalyzer>();
-                services.AddScoped<StoolAnalyzer>();
-                services.AddScoped<AuditLogger>();
+                        // Register services
+                        services.AddScoped<DatabaseService>();
+                        services.AddScoped<AuthService>();
+                        services.AddScoped<UserService>();
+                        services.AddScoped<PatientService>();
+                        services.AddScoped<CalibrationService>();
+                        services.AddScoped<ImageAnalysisService>();
+                        services.AddScoped<VideoAnalysisService>();
+                        services.AddScoped<ReportService>();
+                        services.AddScoped<CBCAnalyzer>();
+                        services.AddScoped<UrineAnalyzer>();
+                        services.AddScoped<StoolAnalyzer>();
+                        services.AddScoped<AuditLogger>();
 
                         // Register Views
                         services.AddTransient<MainWindow>();

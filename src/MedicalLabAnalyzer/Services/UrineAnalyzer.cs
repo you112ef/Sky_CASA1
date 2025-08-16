@@ -5,6 +5,7 @@ using MedicalLabAnalyzer.Models;
 using Microsoft.Extensions.Logging;
 using System.Data;
 using Dapper;
+using System.Linq;
 
 namespace MedicalLabAnalyzer.Services
 {
@@ -31,28 +32,17 @@ namespace MedicalLabAnalyzer.Services
                 var result = new UrineTestResult
                 {
                     ExamId = examId,
-                    Color = values.GetValueOrDefault("Color", "أصفر").ToString(),
-                    pH = Convert.ToDouble(values.GetValueOrDefault("pH", 6.0)),
-                    SpecificGravity = Convert.ToDouble(values.GetValueOrDefault("SpecificGravity", 1.020)),
-                    Appearance = values.GetValueOrDefault("Appearance", "صافي").ToString(),
+                    Color = values.GetValueOrDefault("Color", "Yellow").ToString(),
+                    Turbidity = values.GetValueOrDefault("Turbidity", "Clear").ToString(),
+                    pH = ParseDoubleValue(values, "pH"),
+                    SpecificGravity = ParseDoubleValue(values, "SpecificGravity"),
                     Protein = values.GetValueOrDefault("Protein", "Negative").ToString(),
                     Glucose = values.GetValueOrDefault("Glucose", "Negative").ToString(),
                     Ketones = values.GetValueOrDefault("Ketones", "Negative").ToString(),
                     Blood = values.GetValueOrDefault("Blood", "Negative").ToString(),
-                    Leukocytes = values.GetValueOrDefault("Leukocytes", "Negative").ToString(),
-                    Nitrites = values.GetValueOrDefault("Nitrites", "Negative").ToString(),
-                    Bilirubin = values.GetValueOrDefault("Bilirubin", "Negative").ToString(),
-                    Urobilinogen = values.GetValueOrDefault("Urobilinogen", "Negative").ToString(),
-                    RBC = Convert.ToInt32(values.GetValueOrDefault("RBC", 0)),
-                    WBC = Convert.ToInt32(values.GetValueOrDefault("WBC", 0)),
-                    EpithelialCells = Convert.ToInt32(values.GetValueOrDefault("EpithelialCells", 0)),
-                    Casts = values.GetValueOrDefault("Casts", "None").ToString(),
-                    CastsCount = Convert.ToInt32(values.GetValueOrDefault("CastsCount", 0)),
-                    Crystals = values.GetValueOrDefault("Crystals", "None").ToString(),
-                    CrystalsCount = Convert.ToInt32(values.GetValueOrDefault("CrystalsCount", 0)),
-                    Bacteria = values.GetValueOrDefault("Bacteria", "None").ToString(),
-                    Yeast = values.GetValueOrDefault("Yeast", "None").ToString(),
-                    Parasites = values.GetValueOrDefault("Parasites", "None").ToString(),
+                    LeukocyteEsterase = values.GetValueOrDefault("LeukocyteEsterase", "Negative").ToString(),
+                    Nitrite = values.GetValueOrDefault("Nitrite", "Negative").ToString(),
+                    MicroscopyNotes = values.GetValueOrDefault("MicroscopyNotes", "").ToString(),
                     TestDate = DateTime.Now
                 };
 
@@ -64,7 +54,7 @@ namespace MedicalLabAnalyzer.Services
 
                 // تسجيل في AuditLog
                 _auditLogger?.LogSystemEvent(userId, userName, "Urine_Analysis_Completed", "Urine", 
-                    new { ExamId = examId, Status = result.Status, HasUTI = result.HasUTI() });
+                    new { ExamId = examId, Status = result.Status, AbnormalCount = result.GetAbnormalValues().Count });
 
                 _logger?.LogInformation("Urine analysis completed for exam {ExamId} with status {Status}", examId, result.Status);
 
@@ -101,7 +91,7 @@ namespace MedicalLabAnalyzer.Services
         {
             try
             {
-                var sql = "SELECT * FROM UrineTestResults WHERE ExamId = @ExamId";
+                var sql = "SELECT * FROM Urine_Results WHERE ExamId = @ExamId";
                 return await _db.QueryFirstOrDefaultAsync<UrineTestResult>(sql, new { ExamId = examId });
             }
             catch (Exception ex)
@@ -119,10 +109,10 @@ namespace MedicalLabAnalyzer.Services
             try
             {
                 var sql = @"
-                    SELECT u.* FROM UrineTestResults u
-                    JOIN Exams e ON u.ExamId = e.Id
+                    SELECT u.* FROM Urine_Results u
+                    JOIN Exams e ON u.ExamId = e.ExamId
                     WHERE e.PatientId = @PatientId
-                    ORDER BY u.TestDate DESC";
+                    ORDER BY u.CreatedAt DESC";
                 
                 var results = await _db.QueryAsync<UrineTestResult>(sql, new { PatientId = patientId });
                 return results.AsList();
@@ -144,21 +134,19 @@ namespace MedicalLabAnalyzer.Services
                 result.ValidateResults();
                 
                 var sql = @"
-                    UPDATE UrineTestResults SET
-                        Color = @Color, pH = @pH, SpecificGravity = @SpecificGravity, Appearance = @Appearance,
+                    UPDATE Urine_Results SET
+                        Color = @Color, Turbidity = @Turbidity, pH = @pH, SpecificGravity = @SpecificGravity,
                         Protein = @Protein, Glucose = @Glucose, Ketones = @Ketones, Blood = @Blood,
-                        Leukocytes = @Leukocytes, Nitrites = @Nitrites, Bilirubin = @Bilirubin, Urobilinogen = @Urobilinogen,
-                        RBC = @RBC, WBC = @WBC, EpithelialCells = @EpithelialCells, Casts = @Casts, CastsCount = @CastsCount,
-                        Crystals = @Crystals, CrystalsCount = @CrystalsCount, Bacteria = @Bacteria, Yeast = @Yeast,
-                        Parasites = @Parasites, Status = @Status, Notes = @Notes, TestDate = @TestDate
-                    WHERE Id = @Id";
+                        LeukocyteEsterase = @LeukocyteEsterase, Nitrite = @Nitrite, MicroscopyNotes = @MicroscopyNotes,
+                        CreatedAt = @TestDate
+                    WHERE ExamId = @ExamId";
                 
                 var rowsAffected = await _db.ExecuteAsync(sql, result);
                 
                 if (rowsAffected > 0)
                 {
                     _auditLogger?.LogSystemEvent(userId, userName, "Urine_Result_Updated", "Urine", 
-                        new { ResultId = result.Id, ExamId = result.ExamId, Status = result.Status });
+                        new { ExamId = result.ExamId, Status = result.Status });
                     
                     _logger?.LogInformation("Urine result updated for exam {ExamId}", result.ExamId);
                     return true;
@@ -185,7 +173,7 @@ namespace MedicalLabAnalyzer.Services
                 
                 if (startDate.HasValue && endDate.HasValue)
                 {
-                    whereClause = "WHERE TestDate BETWEEN @StartDate AND @EndDate";
+                    whereClause = "WHERE CreatedAt BETWEEN @StartDate AND @EndDate";
                     parameters.Add("@StartDate", startDate.Value);
                     parameters.Add("@EndDate", endDate.Value);
                 }
@@ -196,13 +184,9 @@ namespace MedicalLabAnalyzer.Services
                         COUNT(CASE WHEN Status = 'Normal' THEN 1 END) as NormalTests,
                         COUNT(CASE WHEN Status = 'Abnormal' THEN 1 END) as AbnormalTests,
                         COUNT(CASE WHEN Status = 'Critical' THEN 1 END) as CriticalTests,
-                        COUNT(CASE WHEN Protein != 'Negative' THEN 1 END) as ProteinuriaCount,
-                        COUNT(CASE WHEN Glucose != 'Negative' THEN 1 END) as GlycosuriaCount,
-                        COUNT(CASE WHEN Blood != 'Negative' THEN 1 END) as HematuriaCount,
-                        COUNT(CASE WHEN Leukocytes != 'Negative' OR Nitrites = 'Positive' THEN 1 END) as UTICount,
                         AVG(pH) as AvgpH,
                         AVG(SpecificGravity) as AvgSpecificGravity
-                    FROM UrineTestResults {whereClause}";
+                    FROM Urine_Results {whereClause}";
 
                 var stats = await _db.QueryFirstAsync<UrineStatistics>(sql, parameters);
                 return stats;
@@ -215,55 +199,46 @@ namespace MedicalLabAnalyzer.Services
         }
 
         /// <summary>
-        /// تحليل الأنماط المرضية في البول
+        /// تحليل الأنماط المرضية
         /// </summary>
         public UrinePatternAnalysis AnalyzePatterns(UrineTestResult result)
         {
             var analysis = new UrinePatternAnalysis();
             
             // UTI Analysis
-            if (result.HasUTI())
+            if (result.LeukocyteEsterase.ToLower() == "positive" || 
+                result.Nitrite.ToLower() == "positive" ||
+                result.Blood.ToLower() == "positive")
             {
                 analysis.HasUTI = true;
                 analysis.UTISeverity = DetermineUTISeverity(result);
             }
             
             // Hematuria Analysis
-            if (result.HasHematuria())
-            {
+            if (result.Blood.ToLower() == "trace")
                 analysis.HasHematuria = true;
-                analysis.HematuriaType = DetermineHematuriaType(result);
-            }
+            else if (result.Blood.ToLower() == "positive")
+                analysis.HasHematuria = true;
             
             // Proteinuria Analysis
-            if (result.HasProteinuria())
-            {
+            if (result.Protein.ToLower() == "trace")
                 analysis.HasProteinuria = true;
-                analysis.ProteinuriaSeverity = DetermineProteinuriaSeverity(result);
-            }
+            else if (result.Protein.ToLower() == "positive")
+                analysis.HasProteinuria = true;
+            else if (result.Protein.ToLower() == "++" || result.Protein.ToLower() == "+++")
+                analysis.HasProteinuria = true;
             
-            // Glycosuria Analysis
-            if (result.HasGlycosuria())
+            // Diabetes Analysis
+            if (result.Glucose.ToLower() == "positive" || result.Glucose.ToLower() == "trace")
             {
-                analysis.HasGlycosuria = true;
-                analysis.GlycosuriaSeverity = DetermineGlycosuriaSeverity(result);
+                analysis.HasGlucosuria = true;
             }
             
-            // pH Analysis
-            if (result.pH < 5.0)
-                analysis.pHCategory = "Acidic";
-            else if (result.pH > 7.5)
-                analysis.pHCategory = "Alkaline";
-            else
-                analysis.pHCategory = "Normal";
-            
-            // Specific Gravity Analysis
-            if (result.SpecificGravity < 1.010)
-                analysis.SpecificGravityCategory = "Dilute";
-            else if (result.SpecificGravity > 1.025)
-                analysis.SpecificGravityCategory = "Concentrated";
-            else
-                analysis.SpecificGravityCategory = "Normal";
+            // Ketosis Analysis
+            if (result.Ketones.ToLower() == "positive" || result.Ketones.ToLower() == "trace")
+            {
+                analysis.HasKetonuria = true;
+            }
             
             return analysis;
         }
@@ -288,38 +263,65 @@ namespace MedicalLabAnalyzer.Services
                 criticalValues.Add($"Specific Gravity critically high: {result.SpecificGravity:F3} (Critical: >1.040)");
             
             // Microscopic Critical Values
-            if (result.RBC > 50)
-                criticalValues.Add($"RBC critically high: {result.RBC}/HPF (Critical: >50)");
-            
-            if (result.WBC > 100)
-                criticalValues.Add($"WBC critically high: {result.WBC}/HPF (Critical: >100)");
+            if (result.Blood.ToLower() == "positive")
+            {
+                if (result.RBC > 10)
+                    criticalValues.Add($"RBC critically high: {result.RBC}/HPF (Critical: >10)");
+                if (result.WBC > 100)
+                    criticalValues.Add($"WBC critically high: {result.WBC}/HPF (Critical: >100)");
+            }
             
             // Chemical Critical Values
-            if (result.Protein == "4+")
-                criticalValues.Add("Protein: 4+ (Critical: Severe proteinuria)");
+            if (result.Protein.ToLower() == "positive" || result.Protein.ToLower() == "trace")
+            {
+                if (result.Protein.ToLower() == "++" || result.Protein.ToLower() == "+++")
+                    criticalValues.Add("Protein: ++ or +++ (Critical: Severe proteinuria)");
+                else
+                    criticalValues.Add("Protein: Positive (Critical: Moderate proteinuria)");
+            }
             
-            if (result.Glucose == "4+")
-                criticalValues.Add("Glucose: 4+ (Critical: Severe glycosuria)");
+            if (result.Glucose.ToLower() == "positive" || result.Glucose.ToLower() == "trace")
+            {
+                if (result.Glucose.ToLower() == "++" || result.Glucose.ToLower() == "+++")
+                    criticalValues.Add("Glucose: ++ or +++ (Critical: Severe glycosuria)");
+                else
+                    criticalValues.Add("Glucose: Positive (Critical: Moderate glycosuria)");
+            }
             
-            if (result.Blood == "4+")
-                criticalValues.Add("Blood: 4+ (Critical: Severe hematuria)");
+            if (result.Blood.ToLower() == "positive")
+            {
+                if (result.Blood.ToLower() == "++" || result.Blood.ToLower() == "+++")
+                    criticalValues.Add("Blood: ++ or +++ (Critical: Severe hematuria)");
+                else
+                    criticalValues.Add("Blood: Positive (Critical: Moderate hematuria)");
+            }
             
             return criticalValues;
         }
 
         #region Private Methods
 
+        private double ParseDoubleValue(Dictionary<string, object> values, string key)
+        {
+            if (values.TryGetValue(key, out var value))
+            {
+                if (value is double doubleValue)
+                    return doubleValue;
+                if (value is string stringValue && double.TryParse(stringValue, out double parsed))
+                    return parsed;
+                if (value is int intValue)
+                    return intValue;
+            }
+            return 0.0;
+        }
+
         private void SaveUrineResult(UrineTestResult result)
         {
             var sql = @"
-                INSERT INTO UrineTestResults (ExamId, Color, pH, SpecificGravity, Appearance, 
-                    Protein, Glucose, Ketones, Blood, Leukocytes, Nitrites, Bilirubin, Urobilinogen,
-                    RBC, WBC, EpithelialCells, Casts, CastsCount, Crystals, CrystalsCount, 
-                    Bacteria, Yeast, Parasites, TestDate, Notes, Status)
-                VALUES (@ExamId, @Color, @pH, @SpecificGravity, @Appearance, 
-                    @Protein, @Glucose, @Ketones, @Blood, @Leukocytes, @Nitrites, @Bilirubin, @Urobilinogen,
-                    @RBC, @WBC, @EpithelialCells, @Casts, @CastsCount, @Crystals, @CrystalsCount, 
-                    @Bacteria, @Yeast, @Parasites, @TestDate, @Notes, @Status)";
+                INSERT INTO Urine_Results (ExamId, Color, Turbidity, pH, SpecificGravity, 
+                    Protein, Glucose, Ketones, Blood, LeukocyteEsterase, Nitrite, MicroscopyNotes, CreatedAt)
+                VALUES (@ExamId, @Color, @Turbidity, @pH, @SpecificGravity, 
+                    @Protein, @Glucose, @Ketones, @Blood, @LeukocyteEsterase, @Nitrite, @MicroscopyNotes, @TestDate)";
             
             _db.Execute(sql, result);
         }
@@ -337,63 +339,40 @@ namespace MedicalLabAnalyzer.Services
 
         private string DetermineUTISeverity(UrineTestResult result)
         {
-            var severity = 0;
+            var positiveCount = 0;
+            if (result.LeukocyteEsterase.ToLower() == "positive") positiveCount++;
+            if (result.Nitrite.ToLower() == "positive") positiveCount++;
+            if (result.Blood.ToLower() == "positive") positiveCount++;
             
-            if (result.Leukocytes != "Negative") severity++;
-            if (result.Nitrites == "Positive") severity++;
-            if (result.Bacteria != "None") severity++;
-            if (result.WBC > 10) severity++;
-            
-            if (severity >= 3)
-                return "Severe";
-            else if (severity >= 2)
-                return "Moderate";
-            else
-                return "Mild";
+            return positiveCount switch
+            {
+                1 => "Mild",
+                2 => "Moderate",
+                >= 3 => "Severe",
+                _ => "None"
+            };
         }
 
         private string DetermineHematuriaType(UrineTestResult result)
         {
-            if (result.Blood != "Negative" && result.RBC > 10)
-                return "Gross Hematuria";
-            else if (result.Blood != "Negative" || result.RBC > 3)
-                return "Microscopic Hematuria";
+            if (result.Blood.ToLower() == "trace")
+                return "Microscopic";
+            else if (result.Blood.ToLower() == "positive")
+                return "Macroscopic";
             else
                 return "None";
         }
 
         private string DetermineProteinuriaSeverity(UrineTestResult result)
         {
-            switch (result.Protein)
-            {
-                case "Trace":
-                    return "Mild";
-                case "1+":
-                case "2+":
-                    return "Moderate";
-                case "3+":
-                case "4+":
-                    return "Severe";
-                default:
-                    return "None";
-            }
-        }
-
-        private string DetermineGlycosuriaSeverity(UrineTestResult result)
-        {
-            switch (result.Glucose)
-            {
-                case "Trace":
-                    return "Mild";
-                case "1+":
-                case "2+":
-                    return "Moderate";
-                case "3+":
-                case "4+":
-                    return "Severe";
-                default:
-                    return "None";
-            }
+            if (result.Protein.ToLower() == "trace")
+                return "Mild";
+            else if (result.Protein.ToLower() == "positive")
+                return "Moderate";
+            else if (result.Protein.ToLower() == "++" || result.Protein.ToLower() == "+++")
+                return "Severe";
+            else
+                return "None";
         }
 
         #endregion
@@ -407,20 +386,12 @@ namespace MedicalLabAnalyzer.Services
         public int NormalTests { get; set; }
         public int AbnormalTests { get; set; }
         public int CriticalTests { get; set; }
-        public int ProteinuriaCount { get; set; }
-        public int GlycosuriaCount { get; set; }
-        public int HematuriaCount { get; set; }
-        public int UTICount { get; set; }
         public double AvgpH { get; set; }
         public double AvgSpecificGravity { get; set; }
         
         public double NormalPercentage => TotalTests > 0 ? (double)NormalTests / TotalTests * 100 : 0;
         public double AbnormalPercentage => TotalTests > 0 ? (double)AbnormalTests / TotalTests * 100 : 0;
         public double CriticalPercentage => TotalTests > 0 ? (double)CriticalTests / TotalTests * 100 : 0;
-        public double ProteinuriaPercentage => TotalTests > 0 ? (double)ProteinuriaCount / TotalTests * 100 : 0;
-        public double GlycosuriaPercentage => TotalTests > 0 ? (double)GlycosuriaCount / TotalTests * 100 : 0;
-        public double HematuriaPercentage => TotalTests > 0 ? (double)HematuriaCount / TotalTests * 100 : 0;
-        public double UTIPercentage => TotalTests > 0 ? (double)UTICount / TotalTests * 100 : 0;
     }
 
     public class UrinePatternAnalysis
@@ -431,10 +402,8 @@ namespace MedicalLabAnalyzer.Services
         public string HematuriaType { get; set; }
         public bool HasProteinuria { get; set; }
         public string ProteinuriaSeverity { get; set; }
-        public bool HasGlycosuria { get; set; }
-        public string GlycosuriaSeverity { get; set; }
-        public string pHCategory { get; set; }
-        public string SpecificGravityCategory { get; set; }
+        public bool HasGlucosuria { get; set; }
+        public bool HasKetonuria { get; set; }
         
         public List<string> GetPatterns()
         {
@@ -449,11 +418,11 @@ namespace MedicalLabAnalyzer.Services
             if (HasProteinuria)
                 patterns.Add($"Proteinuria: {ProteinuriaSeverity}");
             
-            if (HasGlycosuria)
-                patterns.Add($"Glycosuria: {GlycosuriaSeverity}");
+            if (HasGlucosuria)
+                patterns.Add("Glucosuria");
             
-            patterns.Add($"pH: {pHCategory}");
-            patterns.Add($"Specific Gravity: {SpecificGravityCategory}");
+            if (HasKetonuria)
+                patterns.Add("Ketonuria");
             
             return patterns;
         }
