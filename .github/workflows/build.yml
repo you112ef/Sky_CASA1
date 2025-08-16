@@ -1,0 +1,53 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  build:
+    runs-on: windows-2022  # Use Windows Server 2022 explicitly to avoid migration notice
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Cache NuGet packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+          
+    - name: Restore dependencies
+      run: dotnet restore MedicalLabAnalyzer.sln
+      
+    - name: Build solution
+      run: dotnet build MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-restore
+      
+    - name: Run tests
+      run: dotnet test MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-build --verbosity normal
+      
+    - name: Upload build artifacts (Release only)
+      if: matrix.configuration == 'Release'
+      uses: actions/upload-artifact@v3
+      with:
+        name: medical-lab-analyzer-release
+        path: |
+          src/MedicalLabAnalyzer/bin/Release/
+          !src/MedicalLabAnalyzer/bin/Release/**/*.pdb
+        retention-days: 30

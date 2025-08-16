@@ -6,7 +6,7 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+    <!-- <ApplicationIcon>Resources\app.ico</ApplicationIcon> -->
     <AssemblyTitle>Medical Lab Analyzer</AssemblyTitle>
     <AssemblyDescription>Professional Medical Laboratory Management System with Video Analysis</AssemblyDescription>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
