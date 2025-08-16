@@ -1,0 +1,53 @@
+name: Simple Build Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  PROJECT_FILE: 'MedicalLabAnalyzer.csproj'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Clear NuGet cache
+      run: dotnet nuget locals all --clear
+
+    - name: Restore dependencies
+      run: dotnet restore ${{ env.PROJECT_FILE }} --verbosity normal
+
+    - name: Build project
+      run: dotnet build ${{ env.PROJECT_FILE }} --configuration Release --no-restore --verbosity normal
+
+    - name: Test project
+      run: dotnet test ${{ env.PROJECT_FILE }} --configuration Release --no-build --verbosity normal
+
+    - name: Publish project
+      run: dotnet publish ${{ env.PROJECT_FILE }} --configuration Release --runtime win-x64 --self-contained true --output publish/win-x64 --verbosity normal
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts
+        path: publish/win-x64/
+
+    - name: Success message
+      run: |
+        Write-Host "✅ Build completed successfully!"
+        Write-Host "Build Number: ${{ github.run_number }}"
+        Write-Host "Commit: ${{ github.sha }}"
+        Write-Host "Branch: ${{ github.ref_name }}"
