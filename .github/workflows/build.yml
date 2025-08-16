@@ -1,0 +1,75 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop, 'cursor/**' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual triggering
+
+env:
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  build:
+    runs-on: windows-2022  # Use Windows Server 2022 explicitly to avoid migration notice
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+      fail-fast: false  # Don't cancel other jobs if one fails
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.nuget/packages
+          %USERPROFILE%\.nuget\packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+          
+    - name: Clear NuGet cache (if needed)
+      run: dotnet nuget locals all --clear
+      continue-on-error: true
+          
+    - name: Restore dependencies
+      run: dotnet restore MedicalLabAnalyzer.sln --verbosity normal
+      
+    - name: Build solution
+      run: dotnet build MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-restore
+      
+    - name: Create test results directory
+      run: New-Item -ItemType Directory -Path "TestResults" -Force
+      shell: pwsh
+      
+    - name: Run tests
+      run: dotnet test MedicalLabAnalyzer.sln --configuration ${{ matrix.configuration }} --no-build --verbosity normal --logger trx --results-directory TestResults
+      
+    - name: Upload build artifacts (Release only)
+      if: matrix.configuration == 'Release'
+      uses: actions/upload-artifact@v4
+      with:
+        name: medical-lab-analyzer-release-${{ github.sha }}
+        path: |
+          src/MedicalLabAnalyzer/bin/Release/
+        retention-days: 30
+        
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-${{ matrix.configuration }}-${{ github.sha }}
+        path: |
+          TestResults/**/*.trx
+          TestResults/**/*.xml
+        retention-days: 7

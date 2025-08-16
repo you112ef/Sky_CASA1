@@ -73,8 +73,9 @@
   
   <!-- Test project specific settings -->
   <PropertyGroup Condition="$(IsTestProject)">
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>false</UseWPF>
+    <UseWindowsForms>false</UseWindowsForms>
     <IsPackable>false</IsPackable>
     <CollectCoverage>true</CollectCoverage>
   </PropertyGroup>

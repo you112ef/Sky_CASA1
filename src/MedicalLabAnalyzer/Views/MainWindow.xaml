@@ -34,7 +34,7 @@
         <!-- Navigation Sidebar -->
         <materialDesign:Card Grid.Column="0" Margin="8" Padding="0" 
                             Background="{DynamicResource MaterialDesignSurface}"
-                            Elevation="2">
+                            materialDesign:ElevationAssist.Elevation="Dp2">
             <StackPanel>
                 <!-- Header -->
                 <Border Background="{DynamicResource MaterialDesignPrimary}" 
