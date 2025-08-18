@@ -1,0 +1,62 @@
+name: Build Windows Installer (setup.exe)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: [ 'v*' ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  PROJECT_FILE: 'src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj'
+  RUNTIME: 'win-x64'
+  PUBLISH_DIR: 'publish/win-x64'
+
+jobs:
+  build-installer:
+    runs-on: windows-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: |
+          dotnet restore "${{ env.PROJECT_FILE }}" --verbosity minimal
+
+      - name: Publish self-contained (single-file)
+        run: |
+          dotnet publish "${{ env.PROJECT_FILE }}" \
+            --configuration Release \
+            --runtime ${{ env.RUNTIME }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:DebugType=None \
+            -p:DebugSymbols=false \
+            --output "${{ env.PUBLISH_DIR }}"
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup -y --no-progress
+
+      - name: Build installer with Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { $iscc = "C:\Program Files\Inno Setup 6\ISCC.exe" }
+          & "$iscc" ".\install\MedicalLabAnalyzer.iss" /Qp
+
+      - name: Upload setup.exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MedicalLabAnalyzer-setup-${{ env.RUNTIME }}
+          path: install/Output/MedicalLabAnalyzer-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
+

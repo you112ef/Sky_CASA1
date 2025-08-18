@@ -22,8 +22,8 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=LICENSE.txt
-InfoBeforeFile=README.txt
-InfoAfterFile=CHANGELOG.txt
+InfoBeforeFile=..\README.md
+InfoAfterFile=..\CHANGELOG.txt
 OutputDir=Output
 OutputBaseFilename=MedicalLabAnalyzer-Setup
 SetupIconFile=..\src\MedicalLabAnalyzer\Resources\app.ico
@@ -43,9 +43,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked; OnlyBelowVersion: 6.1; Check: not IsAdminInstallMode
 
 [Files]
-; Main application files
-Source: "..\src\MedicalLabAnalyzer\bin\Release\net8.0-windows\win-x64\publish\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\src\MedicalLabAnalyzer\bin\Release\net8.0-windows\win-x64\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Main application files (published self-contained output)
+Source: "..\publish\win-x64\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\publish\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Database folder
 Source: "..\Database\*"; DestDir: "{app}\Database"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -54,16 +54,16 @@ Source: "..\Database\*"; DestDir: "{app}\Database"; Flags: ignoreversion recurse
 Source: "..\src\MedicalLabAnalyzer\Reports\*"; DestDir: "{app}\Reports"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Configuration files
-Source: "..\src\MedicalLabAnalyzer\appsettings.json"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\src\MedicalLabAnalyzer\appsettings.json"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 ; Documentation
-Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "CHANGELOG.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\CHANGELOG.txt"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 ; Create necessary directories
-Source: "..\logs\*"; DestDir: "{app}\logs"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\VideoAnalysis\*"; DestDir: "{app}\VideoAnalysis"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\logs\*"; DestDir: "{app}\logs"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+Source: "..\VideoAnalysis\*"; DestDir: "{app}\VideoAnalysis"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -90,44 +90,6 @@ Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{#MyApp
 Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{#MyAppName}"; ValueType: dword; ValueName: "NoModify"; ValueData: 1; Flags: uninsdeletekey
 Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{#MyAppName}"; ValueType: dword; ValueName: "NoRepair"; ValueData: 1; Flags: uninsdeletekey
 
-[Code]
-var
-  DownloadPage: TDownloadWizardPage;
-
-function OnDownloadProgress(const Url, FileName: String; const Progress, ProgressMax: Int64): Boolean;
-begin
-  if Progress = ProgressMax then
-    Log(Format('Successfully downloaded file to {tmp}: %s', [FileName]));
-  Result := True;
-end;
-
-procedure InitializeWizard;
-begin
-  DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing), SetupMessage(msgPreparingDesc), @OnDownloadProgress);
-end;
-
-function NextButtonClick(CurPageID: Integer): Boolean;
-begin
-  if CurPageID = wpReady then
-  begin
-    DownloadPage.Clear;
-    DownloadPage.Add('https://dotnet.microsoft.com/download/dotnet/8.0', 'dotnet-runtime-8.0-win-x64.exe', '');
-    DownloadPage.Show;
-    try
-      try
-        DownloadPage.Download; // This will block until all downloads are done
-        Result := True;
-      except
-        SuppressibleMsgBox(AddPeriod(GetExceptionMessage), mbCriticalError, MB_OK, IDOK);
-        Result := False;
-      end;
-    finally
-      DownloadPage.Hide;
-    end;
-  end else
-    Result := True;
-end;
-
 [UninstallDelete]
 Type: files; Name: "{app}\logs\*"
 Type: files; Name: "{app}\VideoAnalysis\*"
@@ -135,7 +97,3 @@ Type: files; Name: "{app}\Database\Backups\*"
 Type: dirifempty; Name: "{app}\logs"
 Type: dirifempty; Name: "{app}\VideoAnalysis"
 Type: dirifempty; Name: "{app}\Database\Backups"
-
-[CustomMessages]
-english.InstallingDotNetRuntime=Installing .NET 8.0 Runtime...
-arabic.InstallingDotNetRuntime=تثبيت .NET 8.0 Runtime...
