@@ -1,0 +1,56 @@
+name: Build Windows EXE (Self-contained)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: [ 'v*' ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  PROJECT_FILE: 'src/MedicalLabAnalyzer/MedicalLabAnalyzer.csproj'
+  RUNTIME: 'win-x64'
+  PUBLISH_DIR: 'publish/win-x64'
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: |
+          dotnet restore "${{ env.PROJECT_FILE }}" --verbosity minimal
+
+      - name: Publish self-contained single-file EXE
+        run: |
+          dotnet publish "${{ env.PROJECT_FILE }}" \
+            --configuration Release \
+            --runtime ${{ env.RUNTIME }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:DebugType=None \
+            -p:DebugSymbols=false \
+            --output "${{ env.PUBLISH_DIR }}"
+
+      - name: Show published files
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -File "${{ env.PUBLISH_DIR }}" | Format-Table FullName, Length
+
+      - name: Upload artifact (published EXE)
+        uses: actions/upload-artifact@v4
+        with:
+          name: MedicalLabAnalyzer-${{ env.RUNTIME }}-self-contained
+          path: ${{ env.PUBLISH_DIR }}
+          if-no-files-found: error
+          retention-days: 30
+
